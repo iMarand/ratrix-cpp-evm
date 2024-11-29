@@ -1,6 +1,6 @@
-﻿#include "keccak256.h"
+#include "keccak256.h"
 
-namespace eth {
+namespace pub {
 
 std::string toHex(const std::vector<unsigned char>& data) {
     std::stringstream ss;
@@ -20,7 +20,7 @@ std::string bytesToHex(const unsigned char* data, size_t length) {
     return ss.str();
 }
 
-std::string getAddress(const std::string& privateKeyHex) {
+std::string getPublicKey(const std::string& privateKeyHex) {
     BIGNUM* privateKey = BN_new();
     if (!BN_hex2bn(&privateKey, privateKeyHex.c_str())) {
         BN_free(privateKey);
@@ -85,7 +85,7 @@ std::string getAddress(const std::string& privateKeyHex) {
     EC_GROUP_free(group);
     BN_free(privateKey);
 
-    return address;
+    return publicKeyHex;
 }
 
 } // namespace eth

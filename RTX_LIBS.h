@@ -18,6 +18,7 @@
 
 #include "Libs/generate_seed.h"
 #include "Libs/getEthAddress.h"
+#include "Libs/getPublicKey.h"
 #include "Libs/seed_to_pk.h"
 
 // Utility function to convert different types to string
@@ -84,6 +85,17 @@ namespace RTX {
         catch (const std::exception& e) {
             std::cerr << "Error: " << e.what() << std::endl;
             return "Error Generating Address";
+        }
+    }
+
+    std::string getPublicKey(std::string privateKey) {
+        try {
+            std::string publicKey = pub::getPublicKey(privateKey);
+            return publicKey;
+        }
+        catch (const std::exception& e) {
+            std::cerr << "Error: " << e.what() << std::endl;
+            return "Error Generating Public Key";
         }
     }
 } 
