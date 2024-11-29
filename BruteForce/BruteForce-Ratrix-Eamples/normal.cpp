@@ -1,5 +1,5 @@
 #include <iostream>
-#include "targetLists.h"
+#include "../targetLists.h"
 
 auto main() -> int {
     int measure = 500; // bruteforce for 5000 random addresses
