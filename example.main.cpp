@@ -6,7 +6,8 @@
 #include "callLibs.h"
 
 auto main() -> int {
-    // enter Your Seed
+
+    // Enter Your Seed
     char phrase[] = "hip fossil catalog range orchard adult egg isolate keen marble jazz merry";
 
     // Generate Your Seed
@@ -15,7 +16,12 @@ auto main() -> int {
     // Generate Private Key From The Seed
     std::string privateKey = RTX::toPrivateKey(seed);
 
-    std:: cout << privateKey;
+    // Generate Address From Private Key
+    std::string address = RTX::toAddress(privateKey);
+
+    coutLn("Seed Phrase: ", seed);
+    coutLn("Private Key: ", privateKey);
+    coutLn("Address: ", address);
 
     return 0;
 }

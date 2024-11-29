@@ -17,7 +17,34 @@
 #include <openssl/obj_mac.h>
 
 #include "Libs/generate_seed.h"
+#include "Libs/getEthAddress.h"
 #include "Libs/seed_to_pk.h"
+
+// Utility function to convert different types to string
+template <typename T>
+std::string to_string_impl(const T& value) {
+    if constexpr (std::is_same_v<T, std::string>) {
+        return value;
+    } else if constexpr (std::is_arithmetic_v<T> || std::is_enum_v<T>) {
+        return std::to_string(value);
+    } else {
+        std::ostringstream oss;
+        oss << value;
+        return oss.str();
+    }
+}
+
+// Variadic template function for flexible logging
+template <typename... Args>
+void coutLn(Args&&... args) {
+    (std::cout << ... << to_string_impl(std::forward<Args>(args))) << std::endl;
+}
+
+// Overload for string concatenation-like behavior
+template <typename T>
+std::string operator+(const std::string& prefix, const T& value) {
+    return prefix + to_string_impl(value);
+}
 
 namespace RTX {
     std::string toSeed(char phrase[]) {
@@ -45,7 +72,18 @@ namespace RTX {
             return pk::seedToPrivateKey(seed);
         } catch (const std::exception& e) {
             std::cerr << "Error: " << e.what() << std::endl;
-            return "error";
+            return "Error Generating Private Key";
+        }
+    }
+
+    std::string toAddress(std::string privateKey) {
+        try {
+            std::string address = eth::getAddress(privateKey);
+            return address;
+        }
+        catch (const std::exception& e) {
+            std::cerr << "Error: " << e.what() << std::endl;
+            return "Error Generating Address";
         }
     }
 } 
