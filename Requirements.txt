@@ -1,0 +1,13 @@
+----Ratrix-Pro-EVM-Tool-CPP---
+
+Programming Language: C++
+Programming Language Version: C++ 17 and Above
+Libraries: OpenSSL 3.0 and Above
+Best Compiler To Run The Code: GCC 13.0 and Above
+
+------- Reference Source To Check On (Optional) ------------
+
+GCC => https://sourceforge.net/projects/gcc-win64/files/13.2.0/gcc-13.2.0-no-debug.7z/download
+
+OpenSSL => https://kb.firedaemon.com/support/solutions/articles/4000121705-openssl-binary-distributions-for-microsoft-windows
+
