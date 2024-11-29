@@ -3,12 +3,11 @@
  * Description: This program is for educational purpose, use it as guidline not to attack or brutforce other people's wallets
 */
 
-#include <iostream>
-
 #include "../RTX_LIBS.h"
 #include "../.env"
 #include "targets.h"
 
+namespace RTX_BTF {
 // Randomize For Random Private Key With 64 digits
 std::string randomizeHex(uint_least16_t len) {
 	std::random_device rand;
@@ -32,7 +31,7 @@ class MATCH_ADDRESS {
         std::string rand_privateKey;
         
         bool compareList() {
-            for(int p = 0; p <= 10600; p++) {
+            for(int p = 0; p <= 10722; p++) {
                 if (rand_address == targetAddresses[p]) {
                     return true;
                 }
@@ -64,23 +63,25 @@ void BruteForceFromList(uint32_t leastNum) {
 
 }
 
-void TestProgramMatchList(int opt);
+}
+
+// void TestProgramMatchList(int opt);
 
 // Main Function Of The Program
-auto main() -> int {
-    BruteForceFromList(2000);
+// auto main() -> int {
+//     RTX_BTF::BruteForceFromList(2000);
 
-    return 0;
-}
+//     return 0;
+// }
 
 // Test Function To Test Real Address To Confirm Program If Works
 void TestProgramMatchList(int opt) {
-    MATCH_ADDRESS ADDRESS_OBJ;
+    RTX_BTF::MATCH_ADDRESS ADDRESS_OBJ;
 
     switch (opt) {
         case 1:
-            ADDRESS_OBJ.rand_privateKey = randomizeHex(64);
-            ADDRESS_OBJ.rand_address = RTX::toAddress(randomizeHex(64));
+            ADDRESS_OBJ.rand_privateKey = RTX_BTF::randomizeHex(64);
+            ADDRESS_OBJ.rand_address = RTX::toAddress(RTX_BTF::randomizeHex(64));
 
             break;
         case 2:
