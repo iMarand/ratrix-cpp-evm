@@ -6,6 +6,7 @@
 #include <stdexcept>
 #include <cstdint>
 #include <array>
+#include <random>
 #include <memory>
 
 #include <openssl/param_build.h>
@@ -38,7 +39,7 @@ std::string to_string_impl(const T& value) {
 // Variadic template function for flexible logging
 template <typename... Args>
 void coutLn(Args&&... args) {
-    (std::cout << ... << to_string_impl(std::forward<Args>(args))) << std::endl;
+    (std::cout << ... << to_string_impl(std::forward<Args>(args))) << "\n";
 }
 
 // Overload for string concatenation-like behavior

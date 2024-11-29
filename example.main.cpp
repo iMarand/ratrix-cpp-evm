@@ -3,15 +3,13 @@
 // File: Main.cpp File, Compile And Execute The File
 
 #include <iostream>
+
+#include ".env"
 #include "RTX_LIBS.h"
 
 auto main() -> int {
-
-    // Enter Your Seed
-    char phrase[] = "hip fossil catalog range orchard adult egg isolate keen marble jazz merry";
-
     // Generate Your Seed As Char *
-    std::string seed = RTX::toSeed(phrase);
+    std::string seed = RTX::toSeed(_PHRASE_);
 
     // Generate Private Key From The Seed *
     std::string privateKey = RTX::toPrivateKey(seed);
