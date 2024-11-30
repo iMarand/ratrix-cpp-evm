@@ -24,6 +24,16 @@ std::string randomizeHex(uint_least16_t len) {
     return randVal.str();
 };
 
+void AppendSeen(const std::string& privateKey, const std::string& address) {
+    std::ofstream file("brute.data", std::ios::app);
+    if (!file) {
+        std::cerr << "Error: Unable to open file brute.data for appending." << std::endl;
+        return;
+    }
+    file << "PrivateKey: " << privateKey << ", Address: " << address << "\n";
+    file.close();
+};
+
 // Match The Random Private Key With Its Address And Check From List
 class MATCH_ADDRESS {
     public:
@@ -48,14 +58,19 @@ void BruteForceFromList(uint32_t leastNum) {
     for(int measure = 0; measure < leastNum; measure++) {
         ADDRESS_OBJ.rand_privateKey = randomizeHex(64);
         ADDRESS_OBJ.rand_address = RTX::toAddress(randomizeHex(64));
-
+        
         bool res = ADDRESS_OBJ.compareList();
 
         if(res == true) {
             coutLn("The Random Address Is: ", ADDRESS_OBJ.rand_address);
             coutLn("The Private Key Is: ", ADDRESS_OBJ.rand_privateKey);
 
-            break;
+            AppendSeen(
+                ADDRESS_OBJ.rand_privateKey,
+                ADDRESS_OBJ.rand_address
+            );
+
+            // break;
         } else {
             coutLn("False Result Address: ", ADDRESS_OBJ.rand_address);
         }

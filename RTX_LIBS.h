@@ -2,6 +2,7 @@
 #include <iomanip>
 #include <cstring>
 #include <sstream>
+#include <fstream>
 #include <vector>
 #include <stdexcept>
 #include <cstdint>
@@ -80,8 +81,7 @@ namespace RTX {
 
     std::string toAddress(std::string privateKey) {
         try {
-            std::string address = eth::getAddress(privateKey);
-            return address;
+            return  eth::getAddress(privateKey);;
         }
         catch (const std::exception& e) {
             std::cerr << "Error: " << e.what() << std::endl;
@@ -91,8 +91,7 @@ namespace RTX {
 
     std::string getPublicKey(std::string privateKey) {
         try {
-            std::string publicKey = pub::getPublicKey(privateKey);
-            return publicKey;
+            return pub::getPublicKey(privateKey);
         }
         catch (const std::exception& e) {
             std::cerr << "Error: " << e.what() << std::endl;
