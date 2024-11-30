@@ -6,7 +6,7 @@
 #include "../targetLists.h"
 
 // Compile-time thread count and work distribution
-constexpr int THREAD_COUNT = 50;
+constexpr int THREAD_COUNT = 34;
 
 // Work distribution calculation function
 std::vector<std::pair<int, int>> calculateThreadRanges(int totalAddresses, int threadCount) {
@@ -61,6 +61,7 @@ auto main() -> int {
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime).count();
     
     std::cout << "All " << THREAD_COUNT << " threads completed in " << duration << " milliseconds." << std::endl;
+    system("pause");
     
     return 0;
 }

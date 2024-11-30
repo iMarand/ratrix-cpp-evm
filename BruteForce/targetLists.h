@@ -41,7 +41,7 @@ class MATCH_ADDRESS {
         std::string rand_privateKey;
         
         bool compareList() {
-            for(int p = 0; p <= 11750; p++) {
+            for(int p = 0; p <= 78095; p++) {
                 if (rand_address == targetAddresses[p]) {
                     return true;
                 }

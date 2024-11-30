@@ -56,11 +56,10 @@ public:
         curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
         curl_easy_setopt(curl, CURLOPT_WRITEDATA, &responseBuffer);
         
-        // Disable SSL certificate verification (USE WITH CAUTION)
+        // Disable SSL certificate verification
         curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
         curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
 
-        // Perform the request
         CURLcode res = curl_easy_perform(curl);
 
         if (res != CURLE_OK) {

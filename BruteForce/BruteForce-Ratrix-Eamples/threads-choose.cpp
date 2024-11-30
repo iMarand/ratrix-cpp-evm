@@ -44,6 +44,7 @@ auto main() -> int {
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime).count();
     
     std::cout << "All " << threadCount << " threads completed in " << duration << " milliseconds." << std::endl;
+    system("pause");
     
     return 0;
 }
