@@ -1,0 +1,24 @@
+
+
+------ Simple Log - 1 -------------------------------- 
+Targeted Addresses Number: 78,000
+CPU Threads Number: CPU 34 threads
+------  Actual Data ----------------------------------
+
+1 sec ==> 385 addresses
+1 min ==> 23,050 addresses
+1 hour ==> 1,384,600 addresses
+1 day ==> 33,230,000 addresses
+
+--------Approx Data ----------------------------------
+| 1 second -----> scans 385 addresses
+| 1 minute -----> scans 23K addresses
+| 1 hour   -----> scans 1.3M addresses
+| 1 day    -----> scans 33.23M addresses
+------------------------------------------------------
+
+ / \                                            / \
+/ C \ USE "BRUTE-SAFE.EXE" FOR ACCURANT RESULT / C \
+^^^^^                                          ^^^^^
+
+````````RATRIX BRUTEFORCE_DEVELOPED_BY_MARAND`````````

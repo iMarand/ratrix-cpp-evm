@@ -9,18 +9,17 @@
 constexpr int THREAD_COUNT = 34;
 
 // Work distribution calculation function
+
 std::vector<std::pair<int, int>> calculateThreadRanges(int totalAddresses, int threadCount) {
     std::vector<std::pair<int, int>> ranges;
     int baseRange = totalAddresses / threadCount;
     int remainder = totalAddresses % threadCount;
 
+    int currentStart = 0;
     for (int i = 0; i < threadCount; ++i) {
-        int start = i * baseRange;
-        int end = (i == threadCount - 1) 
-            ? (start + baseRange + remainder)
-            : (start + baseRange);
-        
-        ranges.emplace_back(start, end);
+        int rangeSize = baseRange + (i < remainder ? 1 : 0);
+        ranges.emplace_back(currentStart, currentStart + rangeSize);
+        currentStart += rangeSize;
     }
 
     return ranges;

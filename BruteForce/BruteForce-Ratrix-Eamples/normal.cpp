@@ -6,6 +6,7 @@ auto main() -> int {
     
     // start bruteForce Function
     RTX_BTF::BruteForceFromList(measure);
+    
 
     return 0;
 }
