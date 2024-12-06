@@ -60,7 +60,7 @@ void runBruteForce(int start, int end) {
     for(int measure = start; measure < end; measure++) {
         RTX_BTF::MATCH_ADDRESS ADDRESS_OBJ;
         ADDRESS_OBJ.rand_privateKey = RTX_BTF::randomizeHex(64);
-        ADDRESS_OBJ.rand_address = RTX::toAddress(RTX_BTF::randomizeHex(64));
+        ADDRESS_OBJ.rand_address = RTX::toAddress(ADDRESS_OBJ.rand_privateKey);
         
         bool res = ADDRESS_OBJ.compareList();
 
