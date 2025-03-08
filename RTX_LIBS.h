@@ -9,19 +9,23 @@
 #include <array>
 #include <random>
 #include <memory>
+#include <cassert>
+#include <bitset>
 
 #include <openssl/param_build.h>
 #include <openssl/core_names.h>
+#include <openssl/obj_mac.h>
 #include <openssl/evp.h>
 #include <openssl/kdf.h>
 #include <openssl/ec.h>
 #include <openssl/bn.h>
-#include <openssl/obj_mac.h>
+#include <openssl/sha.h>
 
 #include "Libs/generate_seed.h"
 #include "Libs/getEthAddress.h"
 #include "Libs/getPublicKey.h"
 #include "Libs/seed_to_pk.h"
+#include "Libs/toSeedPhrase.h"
 
 template <typename T>
 std::string to_string_impl(const T& value) {
@@ -76,19 +80,24 @@ namespace RTX {
         
         // Mersenne Twister engine with better statistical properties
         std::mt19937_64 generator(rd());
-        
-        // Distribution for random hex digits (0-15)
         std::uniform_int_distribution<int> distribution(0, 15);
-        
         std::stringstream ss;
-        
-        // Generate the requested number of hex digits
+
         for (int i = 0; i < length; ++i) {
             int randomValue = distribution(generator);
             ss << std::hex << randomValue;
         }
         
         return ss.str();
+    }
+
+    std::string toSeedPhrase(std::string entropy) {
+        try {
+            return generateBip39Mnemonic(entropy);
+        } catch (const std::exception& e) {
+            std::cerr << "Error: " << e.what() << std::endl;
+            return "Error Generating Seed Phrase";
+        }
     }
 
     std::string toPrivateKey(std::string seed) {

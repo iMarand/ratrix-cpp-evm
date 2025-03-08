@@ -12,11 +12,10 @@ auto main() -> int {
     std::string rEntropy = RTX::randEntropy(32);
 
     // Generate Seed Phrase From Entropy
+    std::string seedPhrase = RTX::toSeedPhrase(rEntropy);
 
-    // Generate Your Seed
-    std::string phrase = "hip fossil catalog range orchard adult egg isolate keen marble jazz merry";
-
-    std::string seed = RTX::toSeed(phrase);
+    // Generate Seed From Seed Phrase
+    std::string seed = RTX::toSeed(seedPhrase);
 
     // Generate Private Key From The Seed *
     std::string privateKey = RTX::toPrivateKey(seed);
@@ -28,10 +27,11 @@ auto main() -> int {
     std::string publicKey = RTX::getPublicKey(privateKey);
 
     coutLn("Entropy: ", rEntropy);
-    coutLn("Seed Phrase: ", seed);
+    coutLn("Seed Phrase: ", seedPhrase);
+    coutLn("Seed: ", seed, "\n");
     coutLn("Private Key: ", privateKey);
+    coutLn("Public Key: ", publicKey, "\n");
     coutLn("Address: ", address);
-    coutLn("Public Key: ", publicKey);
 
     return 0;
 }
