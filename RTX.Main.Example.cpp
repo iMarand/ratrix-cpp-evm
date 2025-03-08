@@ -8,8 +8,15 @@
 #include "RTX_LIBS.h"
 
 auto main() -> int {
-    // Generate Your Seed As Char *
-    std::string seed = RTX::toSeed(_PHRASE_);
+    // Generate Random Entropy
+    std::string rEntropy = RTX::randEntropy(32);
+
+    // Generate Seed Phrase From Entropy
+
+    // Generate Your Seed
+    std::string phrase = "hip fossil catalog range orchard adult egg isolate keen marble jazz merry";
+
+    std::string seed = RTX::toSeed(phrase);
 
     // Generate Private Key From The Seed *
     std::string privateKey = RTX::toPrivateKey(seed);
@@ -20,6 +27,7 @@ auto main() -> int {
     // You Can Check Also Public Key (Optional)
     std::string publicKey = RTX::getPublicKey(privateKey);
 
+    coutLn("Entropy: ", rEntropy);
     coutLn("Seed Phrase: ", seed);
     coutLn("Private Key: ", privateKey);
     coutLn("Address: ", address);
