@@ -30,13 +30,25 @@ void AppendSeen(const std::string& privateKey, const std::string& address) {
         std::cerr << "Error: Unable to open file brute.data for appending." << std::endl;
         return;
     }
-    file << "PrivateKey: " << privateKey << ", Address: " << address << "\n";
+    file << "PrivateKey: " << privateKey << "Address: " << address << "\n";
+    file.close();
+};
+
+void AppendSeen_(const std::string& entropy, const std::string& seedPhrase, const std::string& privateKey, const std::string& address) {
+    std::ofstream file("brute.data", std::ios::app);
+    if (!file) {
+        std::cerr << "Error: Unable to open file brute.data for appending." << std::endl;
+        return;
+    }
+    file << "Entropy: " << entropy << "Seed Phrase: " << seedPhrase << "PrivateKey: " << privateKey << ", Address: " << address << "\n";
     file.close();
 };
 
 // Match The Random Private Key With Its Address And Check From List
 class MATCH_ADDRESS {
     public:
+        std::string entropy;
+        std::string seedPhrase;
         std::string rand_address;
         std::string rand_privateKey;
         
@@ -51,6 +63,38 @@ class MATCH_ADDRESS {
         };
 };
 
+// This Will Loop The Random Address To Match It To The Provided List
+void BruteForceFromList_(uint32_t leastNum) {
+    MATCH_ADDRESS ADDRESS_OBJ;
+
+    for(int measure = 0; measure < leastNum; measure++) {
+        ADDRESS_OBJ.entropy = randomizeHex(32);
+        ADDRESS_OBJ.seedPhrase = RTX::toSeedPhrase(ADDRESS_OBJ.entropy);
+        std::string seed = RTX::toSeed(ADDRESS_OBJ.seedPhrase);
+
+        ADDRESS_OBJ.rand_privateKey = RTX::toPrivateKey(seed);
+        ADDRESS_OBJ.rand_address = RTX::toAddress(ADDRESS_OBJ.rand_privateKey);
+        
+        bool res = ADDRESS_OBJ.compareList();
+
+        if(res == true) {
+            coutLn("The Random Address Is: ", ADDRESS_OBJ.rand_address);
+            coutLn("The Private Key Is: ", ADDRESS_OBJ.rand_privateKey);
+
+            AppendSeen_(
+                ADDRESS_OBJ.entropy,
+                ADDRESS_OBJ.seedPhrase,
+                ADDRESS_OBJ.rand_privateKey,
+                ADDRESS_OBJ.rand_address
+            );
+
+            // break;
+        } else {
+            coutLn("False Result Address: ", ADDRESS_OBJ.rand_address, " Entropy:  ", ADDRESS_OBJ.entropy);
+        }
+    }
+}
+
 
 // This Will Loop The Random Address To Match It To The Provided List
 void BruteForceFromList(uint32_t leastNum) {
@@ -58,7 +102,7 @@ void BruteForceFromList(uint32_t leastNum) {
 
     for(int measure = 0; measure < leastNum; measure++) {
         ADDRESS_OBJ.rand_privateKey = randomizeHex(64);
-        ADDRESS_OBJ.rand_address = RTX::toAddress(randomizeHex(64));
+        ADDRESS_OBJ.rand_address = RTX::toAddress(ADDRESS_OBJ.rand_privateKey);
         
         bool res = ADDRESS_OBJ.compareList();
 
@@ -76,7 +120,6 @@ void BruteForceFromList(uint32_t leastNum) {
             coutLn("False Result Address: ", ADDRESS_OBJ.rand_address);
         }
     }
-
 }
 
 };
