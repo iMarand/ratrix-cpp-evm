@@ -34,6 +34,26 @@ void AppendSeen(const std::string& privateKey, const std::string& address) {
     file.close();
 };
 
+void AppendAddresses(const std::string& address) {
+    std::ofstream file("bruteRandom.data", std::ios::app);
+    if (!file) {
+        std::cerr << "Error: Unable to open file bruteRandom.data for appending." << std::endl;
+        return;
+    }
+    file << address << "\n";
+    file.close();
+};
+
+void AppendPrivateKeys(const std::string& privatekeys) {
+    std::ofstream file("bruteRandomPrivate.data", std::ios::app);
+    if (!file) {
+        std::cerr << "Error: Unable to open file brutePrivatekeys.data for appending." << std::endl;
+        return;
+    }
+    file << privatekeys << "\n";
+    file.close();
+};
+
 void AppendSeen_(const std::string& entropy, const std::string& seedPhrase, const std::string& privateKey, const std::string& address) {
     std::ofstream file("brute.data", std::ios::app);
     if (!file) {
@@ -43,6 +63,7 @@ void AppendSeen_(const std::string& entropy, const std::string& seedPhrase, cons
     file << "Entropy: " << entropy << "Seed Phrase: " << seedPhrase << "PrivateKey: " << privateKey << ", Address: " << address << "\n";
     file.close();
 };
+
 
 // Match The Random Private Key With Its Address And Check From List
 class MATCH_ADDRESS {
@@ -119,6 +140,18 @@ void BruteForceFromList(uint32_t leastNum) {
         } else {
             coutLn("False Result Address: ", ADDRESS_OBJ.rand_address);
         }
+    }
+}
+
+void BruteForceFromListRandom(uint32_t leastNum) {
+    MATCH_ADDRESS ADDRESS_OBJ;
+
+    for(int measure = 0; measure < leastNum; measure++) {
+        ADDRESS_OBJ.rand_privateKey = randomizeHex(64);
+        ADDRESS_OBJ.rand_address = RTX::toAddress(ADDRESS_OBJ.rand_privateKey);
+        
+        AppendAddresses(ADDRESS_OBJ.rand_address);
+        AppendPrivateKeys(ADDRESS_OBJ.rand_privateKey);
     }
 }
 

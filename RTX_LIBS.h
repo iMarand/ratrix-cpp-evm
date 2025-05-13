@@ -26,6 +26,7 @@
 #include "Libs/getPublicKey.h"
 #include "Libs/seed_to_pk.h"
 #include "Libs/toSeedPhrase.h"
+#include "BalanceChecker/Balances.h"
 
 template <typename T>
 std::string to_string_impl(const T& value) {
@@ -56,8 +57,7 @@ namespace RTX {
     std::string toSeed(const std::string& phrase) {
         const unsigned char salt[] = "mnemonic";
         int salt_len = strlen((const char*)salt);
-    
-        // Convert std::string to const char* for the generate_seed function
+
         const char* phrase_cstr = phrase.c_str();
         unsigned char* seed = seed::generate_seed(phrase_cstr, salt, salt_len);
         

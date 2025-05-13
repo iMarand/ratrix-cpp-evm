@@ -61,10 +61,7 @@ std::string getPublicKey(const std::string& privateKeyHex) {
         throw std::runtime_error("Public key conversion failed");
     }
 
-    // Remove the first byte (0x04) which indicates uncompressed public key
     std::vector<unsigned char> publicKeyBytesWithout04(publicKeyBytes.begin() + 1, publicKeyBytes.end());
-
-    // Convert public key bytes to hex string for Keccak-256
     std::string publicKeyHex = toHex(publicKeyBytesWithout04);
 
     std::string hash;

@@ -5,7 +5,7 @@
 #include "../targetLists.h"
 
 void runBruteForce(int c) {
-    RTX_BTF::BruteForceFromList_(c);
+    RTX_BTF::BruteForceFromListRandom(c);
     coutLn("Started Well");
 }
 

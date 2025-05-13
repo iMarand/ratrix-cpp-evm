@@ -8,6 +8,7 @@ Best Compiler To Run The Code: GCC 13.0 and Above
 ------- Reference Source To Check On (Optional) ------------
 
 GCC => https://sourceforge.net/projects/gcc-win64/files/13.2.0/gcc-13.2.0-no-debug.7z/download
+GCC => MSYS2 GCC download with pacman
 
 OpenSSL => https://kb.firedaemon.com/support/solutions/articles/4000121705-openssl-binary-distributions-for-microsoft-windows
 

@@ -49,10 +49,10 @@ std::string getAddress(const std::string& privateKeyHex) {
 
     std::vector<unsigned char> publicKeyBytes(65);
     size_t publicKeyLen = EC_POINT_point2oct(group, publicKeyPoint, 
-                                            POINT_CONVERSION_UNCOMPRESSED, 
-                                            publicKeyBytes.data(), 
-                                            publicKeyBytes.size(), 
-                                            NULL);
+        POINT_CONVERSION_UNCOMPRESSED, 
+        publicKeyBytes.data(), 
+        publicKeyBytes.size(), 
+        NULL);
     
     if (publicKeyLen != 65) {
         EC_POINT_free(publicKeyPoint);
@@ -63,8 +63,6 @@ std::string getAddress(const std::string& privateKeyHex) {
 
     // Remove the first byte (0x04) which indicates uncompressed public key
     std::vector<unsigned char> publicKeyBytesWithout04(publicKeyBytes.begin() + 1, publicKeyBytes.end());
-
-    // Convert public key bytes to hex string for Keccak-256
     std::string publicKeyHex = toHex(publicKeyBytesWithout04);
 
     std::string hash;

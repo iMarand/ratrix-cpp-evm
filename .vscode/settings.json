@@ -1,5 +1,6 @@
 {
     "files.associations": {
+        "*.embeddedhtml": "html",
         "cstring": "cpp",
         "array": "cpp",
         "atomic": "cpp",
@@ -83,6 +84,13 @@
         "thread": "cpp",
         "valarray": "cpp",
         "xhash": "cpp",
-        "xtree": "cpp"
-    }
+        "xtree": "cpp",
+        "bitset": "cpp",
+        "condition_variable": "cpp",
+        "mutex": "cpp",
+        "semaphore": "cpp",
+        "text_encoding": "cpp",
+        "cinttypes": "cpp"
+    },
+    "C_Cpp.default.compilerPath": "C:/msys64/mingw64/bin/g++.exe"
 }
