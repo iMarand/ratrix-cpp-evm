@@ -1,0 +1,15 @@
+{
+  "name": "trackable",
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "node --watch main.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "web3": "^4.16.0",
+    "ws": "^8.18.2"
+  }
+}
