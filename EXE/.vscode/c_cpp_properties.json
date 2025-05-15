@@ -1,0 +1,23 @@
+{
+    "configurations": [
+        {
+            "name": "Win32",
+            "includePath": [
+                "${workspaceFolder}/**",
+                "C:/msys64/mingw64/include/qt6/QtCore",
+                "C:/msys64/mingw64/include",
+                "C:/msys64/mingw64/include/qt6",
+                "C:/msys64/mingw64/include/qt6/QtNetwork",
+                "C:/msys64/mingw64/include/qt6/QtWidgets",
+                "C:/msys64/mingw64/include/qt6/QtWebSockets",
+                "C:/msys64/mingw64/include/qt6/QtTextToSpeech"
+            ],
+            "defines": [
+                "_DEBUG",
+                "UNICODE",
+                "_UNICODE"
+            ]
+        }
+    ],
+    "version": 4
+}

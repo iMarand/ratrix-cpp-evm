@@ -27,7 +27,8 @@ std::vector<std::pair<int, int>> calculateThreadRanges(int totalAddresses, int t
 
 void runBruteForce(int start, int end) {
     int measure = end - start;
-    RTX_BTF::BruteForceFromList(measure);
+    RTX_BTF::BruteForceFromListRandom(measure);
+    // RTX_BTF::BruteForceFromList(measure);
 }
 
 auto main() -> int {

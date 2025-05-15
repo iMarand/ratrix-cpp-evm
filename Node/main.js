@@ -9,7 +9,7 @@ async function getMultipleBalancesWSS(addresses) {
         const results = {};
         let nextId = 1;
         
-        const ws = new WebSocket('wss://eth.drpc.org');
+        const ws = new WebSocket('wss://bsc.drpc.org');
             ws.on('open', () => {
                 console.log('WebSocket connection established');
                 console.time('Balance fetch operation');
@@ -101,6 +101,10 @@ async function fetchMultipleBalances() {
         console.log("WebSocket Results:");
         
         Object.entries(results).map(([address, balance], index) => {
+            if(balance.eth > 0.0001) {
+                FS.appendFileSync("found.txt", `-->>> ${address} :: ${index} :: ${balance.eth} ->> \n`);
+            }
+
             console.log(`${index}::${address}: ${balance.eth} ETH`);
         });
         

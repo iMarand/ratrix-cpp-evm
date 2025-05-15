@@ -1,4 +1,5 @@
 #include <iostream>
+#include <boost/version.hpp>
 #include "../RTX_LIBS.h"
 
 
@@ -7,7 +8,7 @@ auto main() -> int {
     RTX_BALANCE::BNBBalanceChecker checker;
 
     std::string balance = checker.getBalance(address);
-    std::cout << "Balance for " << address << ": " << balance << " BNB" << std::endl;
+    std::cout << "Balance for " << address << ": " << balance << " BNB" << BOOST_LIB_VERSION << std::endl;
 
     return 0;
 }
