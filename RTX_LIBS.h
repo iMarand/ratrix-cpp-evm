@@ -75,10 +75,25 @@ namespace RTX {
         return sd.str();
     }
 
-    std::string randEntropy(int length) {
+    std::string randPrivateKey() {
+        int length = 64;
         std::random_device rd;
         
         // Mersenne Twister engine with better statistical properties
+        std::mt19937_64 generator(rd());
+        std::uniform_int_distribution<int> distribution(0, 15);
+        std::stringstream ss;
+
+        for (int i = 0; i < length; ++i) {
+            int randomValue = distribution(generator);
+            ss << std::hex << randomValue;
+        }
+        
+        return ss.str();
+    }
+
+    std::string randEntropy(int length) {
+        std::random_device rd;
         std::mt19937_64 generator(rd());
         std::uniform_int_distribution<int> distribution(0, 15);
         std::stringstream ss;

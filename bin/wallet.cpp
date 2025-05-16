@@ -93,9 +93,82 @@ struct COMMAND {
         }
     };
 
-    void Import() {
+    void ImportWallet() {
         try {
-            coutLn(args[1], "<-->", "View Command");
+            if(!args[2] || !args[3] || !args[4]) throw std::runtime_error("Missing some argument, supports 5 args");
+
+            std::string flag = args[2];
+            std::string indicator = args[3];
+            std::string walletName = args[4];
+
+            std::unordered_map<std::string, std::function<void()>> flagActions = {
+                {"-p", [&indicator, &walletName]() {
+                    std::string fAddress = RTX::toAddress(indicator);
+
+                    if(fAddress.find("Error") != std::string::npos) throw std::runtime_error("Unable to import wallet, check entered private key");
+                    std::string walletURL = "wallets/WALLET_" + walletName + "_DATA.json";
+
+                    if(fs::exists(walletURL)) throw std::runtime_error("Wallet name exists, try another name");
+
+                    std::ofstream walletFile(walletURL);
+                    json iWallets = {};
+
+                    iWallets["walletName"] = walletName;
+                    iWallets["address"] = fAddress;
+                    iWallets["privateKey"] = indicator;
+                    iWallets["walletType"] = "IMPORTED";
+
+                    walletFile << iWallets.dump(4) << std::endl;
+                    coutLn(GREEN, "Wallet Imported Successfully", RESET);
+                    
+                }},
+                {"-e", [&indicator, &walletName]() {
+                    std::string walletURL = "wallets/WALLET_" + walletName + "_DATA.json";
+                    if(fs::exists(walletURL)) throw std::runtime_error("Wallet name exists, try another name");
+
+                    std::string seedPhrase = RTX::toSeedPhrase(indicator);
+                    if(seedPhrase.find("Error") != std::string::npos) throw std::runtime_error("Unable to import wallet, check entered Entropy");
+                    
+                    std::ofstream walletFile(walletURL);
+                    std::string seed = RTX::toSeed(seedPhrase);
+                    std::string privateKey = RTX::toPrivateKey(seed);
+                    std::string address = RTX::toAddress(privateKey);
+
+                    json iWallet = {};
+                    iWallet["address"] = address;
+                    iWallet["seedPhrase"] = seedPhrase;
+                    iWallet["privateKey"] = privateKey;
+                    iWallet["walletName"] = walletName;
+                    iWallet["entropy"] = indicator;
+                    iWallet["walletType"] = "IMPORTED";
+
+                    walletFile << iWallet.dump(4) << std::endl;
+                    coutLn(GREEN, "Wallet Imported Successfully", RESET);
+                }},
+                {"-s", [&indicator, &walletName]() {
+                    std::string walletURL = "wallets/WALLET_" + walletName + "_DATA.json";
+                    if(fs::exists(walletURL)) throw std::runtime_error("Wallet name exists, try another name");
+
+                    std::string seed = RTX::toSeed(indicator);
+                    if(seed.find("Error") != std::string::npos) throw std::runtime_error("Unable to import wallet, check entered Entropy");
+                    
+                    std::ofstream walletFile(walletURL);
+                    std::string privateKey = RTX::toPrivateKey(seed);
+                    std::string address = RTX::toAddress(privateKey);
+
+                    json iWallet = {};
+                    iWallet["address"] = address;
+                    iWallet["seedPhrase"] = indicator;
+                    iWallet["privateKey"] = privateKey;
+                    iWallet["walletName"] = walletName;
+                    iWallet["walletType"] = "IMPORTED";
+
+                    walletFile << iWallet.dump(4) << std::endl;
+                    coutLn(GREEN, "Wallet Imported Successfully", RESET);
+                }}
+            };
+
+            flagActions[flag]();
     
         } catch(std::exception& err) {
             std::cerr << err.what() << std::endl;
@@ -104,14 +177,25 @@ struct COMMAND {
 
     void DropWallet() {
         try {
-             if(!args[2]) throw std::runtime_error("Missing some argument");
+            if(!args[2] || !args[3]) throw std::runtime_error("Missing some argument, supports 4 args");
+
+            std::string which = args[2];
+            std::string pWhich = which;
+            std::string confirmation = args[3];
+
+            which = "wallets/WALLET_" + which + "_DATA.json";
+            if(!fs::exists(which)) throw std::runtime_error("Wallet entered doesn't exists");
+            if(confirmation != "--confirm-drop") throw std::runtime_error("Confirm dropping using --confirm-drop");
+
+            fs::remove(which);
+            coutLn(RED, "Deleted Wallet ", pWhich, " Successfully", RESET);
     
         } catch(std::exception& err) {
             std::cerr << err.what() << std::endl;
         }
     };
 
-    void Get() {
+    void GetWallet() {
         try {
             if(!args[2] || !args[3]) throw std::runtime_error("Missing some arguments, must have 4 args");
 
@@ -148,10 +232,9 @@ void walletHelpCommands() {
     std::cout << "-----------------------------------------------------------------\n";
     std::cout << " " << YELLOW << "1. rtx create-wallet <wallet name>" << RESET << " \n";
     std::cout << " " << GREEN << "2. rtx view wallets" << RESET << "            \n";
-    std::cout << " " << YELLOW << "3. rtx drop <wallet name>" << RESET << "         \n";
-    std::cout << " " << GREEN << "4. rtx get-<wallet name> <wallet_key> eg: rtx get-wallet main-wallet address" << RESET << "        \n";
-    std::cout << " " << YELLOW << "5. rtx <wallet> export-data <file>" << RESET << "\n";
-    std::cout << " " << GREEN << "6. rtx <wallet> <crypto> receive" << RESET << " \n";
+    std::cout << " " << YELLOW << "3. rtx drop-wallet <walletName>" << RESET << "         \n";
+    std::cout << " " << GREEN << "4. rtx get-wallet <wallet name> <wallet property key> " << RESET << "        \n";
+    std::cout << " " << GREEN << "5. rtx <wallet> <crypto> receive" << RESET << " \n";
     std::cout << "-----------------------------------------------------------------\n";
     std::cout << "               Visit: github.com/iMarand/ratrix                 \n";
     std::cout << "-----------------------------------------------------------------\n";
@@ -172,22 +255,22 @@ auto main(int argc, char** argv) -> int {
         return 1;
     }
 
+    coutLn(" ");
+
     if(argv[1]) {
         std::string fArg = argv[1];
         std::unordered_map<std::string, std::function<void()>> commandMap = {
-            {"get-wallet", [&argv]() { COMMAND(argv).Get(); }},
+            {"get-wallet", [&argv]() { COMMAND(argv).GetWallet(); }},
             {"view", [&argv]() { COMMAND(argv).View(); }},
             {"drop-wallet", [&argv]() { COMMAND(argv).DropWallet(); }},
-            {"import", [&argv]() { COMMAND(argv).Import(); }},
+            {"import-wallet", [&argv]() { COMMAND(argv).ImportWallet(); }},
             {"create-wallet", [&argv]() { COMMAND(argv).CreateWallet(); }},
         };
 
         commandMap[fArg]();
     }
 
-
     std::string arg1 = argv[1];
-    std::cout << "Welcome To Ratrix" << __cplusplus << "\n";
 
     return 0;
 }
