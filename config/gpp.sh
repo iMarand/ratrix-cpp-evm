@@ -1,0 +1,4 @@
+# Command to handle all Includes and Libs 
+# Libs are Boost - Openssl - QT6 - Curl
+
+g++ "$1" -o "${2:-app}" -IC:/msys64/mingw64/include/qt6/QtWidgets -IC:/msys64/mingw64/include/qt6 -DQT_WIDGETS_LIB -IC:/msys64/mingw64/include/qt6/QtGui -DQT_GUI_LIB -IC:/msys64/mingw64/include/qt6/QtNetwork -DQT_NETWORK_LIB -IC:/msys64/mingw64/include/qt6/QtSql -DQT_SQL_LIB -IC:/msys64/mingw64/include/qt6/QtCore -DQT_CORE_LIB -IC:/msys64/mingw64/share/qt6/mkspecs/win32-g++ -DWIN32 -D_ENABLE_EXTENDED_ALIGNED_STORAGE -DWIN64 -D_WIN64 -DMINGW_HAS_SECURE_API=1 -D_WIN32_WINNT=0x0A00 -DWINVER=0x0A00 -lQt6Widgets -lQt6Gui -lQt6Network -lQt6Sql -lQt6Core -L/mingw64/lib -lcurl -lssl -lcrypto -luser32 -lws2_32 -lboost_thread-mt -lboost_filesystem-mt -pthread

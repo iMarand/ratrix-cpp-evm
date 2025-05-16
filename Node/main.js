@@ -32,8 +32,7 @@ async function getMultipleBalancesWSS(addresses) {
             const response = JSON.parse(data.toString());
             const { id, result } = response;
             
-            if (pendingRequests.has(id)) {
-                const address = pendingRequests.get(id);
+            if (pendingRequests.has(id)) {                const address = pendingRequests.get(id);
                 pendingRequests.delete(id);
                 
                 const balanceInWei = result;
