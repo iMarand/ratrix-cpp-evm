@@ -218,6 +218,47 @@ struct COMMAND {
             std::cerr << err.what() << std::endl;
         }
     }
+
+    void GetBalance() {
+        try {
+            if(!args[2]) throw std::runtime_error("Missing some arguments, must have 3 args");
+
+            std::string walletURL = args[2];
+
+            std::string balanceOption;
+            
+            if(args[3]) {balanceOption = args[3];}
+            walletURL = "wallets/WALLET_" + walletURL + "_DATA.json";
+
+            if(!fs::exists(walletURL)) throw std::runtime_error("Unable to find the wallet");
+            std::ifstream wFile(walletURL);
+            std::string wallet((std::istreambuf_iterator<char>(wFile)), std::istreambuf_iterator<char>());
+
+            json tWallet = json::parse(wallet);
+            std::string walletAddress = tWallet["address"].get<std::string>();
+
+            if(balanceOption == "-ETH" || balanceOption == "-eth") {
+                RTX_BALANCE::EthereumBalanceChecker checker;
+                std::string balance = checker.getBalance(walletAddress);
+
+                coutLn("Address ", walletAddress, " Balance Of: ", balance, " ETH");
+            } else if(balanceOption == "-BNB" || balanceOption == "-bnb") {
+                RTX_BALANCE::BNBBalanceChecker checker;
+                std::string balance = checker.getBalance(walletAddress);
+                
+                coutLn("Address ", walletAddress, " Balance Of: ", balance, " BNB");
+            } else {
+                RTX_BALANCE::EthereumBalanceChecker checker;
+                std::string balance = checker.getBalance(walletAddress);
+
+                coutLn("Address ", walletAddress, " Balance Of: ", balance, " ETH");
+            }
+
+
+        } catch(std::exception& err) {
+            std::cerr << err.what() << std::endl;
+        }
+    }
 };
 
 void walletHelpCommands() {
@@ -261,6 +302,7 @@ auto main(int argc, char** argv) -> int {
         std::string fArg = argv[1];
         std::unordered_map<std::string, std::function<void()>> commandMap = {
             {"get-wallet", [&argv]() { COMMAND(argv).GetWallet(); }},
+            {"get-balance", [&argv]() {COMMAND(argv).GetBalance(); }},
             {"view", [&argv]() { COMMAND(argv).View(); }},
             {"drop-wallet", [&argv]() { COMMAND(argv).DropWallet(); }},
             {"import-wallet", [&argv]() { COMMAND(argv).ImportWallet(); }},
