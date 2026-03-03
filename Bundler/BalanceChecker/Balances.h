@@ -6,6 +6,15 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <vector>
+
+class CurlRequestError : public std::runtime_error {
+public:
+    explicit CurlRequestError(CURLcode errorCode, const std::string& message)
+        : std::runtime_error(message), code(errorCode) {}
+
+    CURLcode code;
+};
 
 class CurlHandler {
 private:
@@ -19,7 +28,13 @@ private:
     }
 
 public:
-    CurlHandler() : curl(curl_easy_init()), headers(nullptr) {
+    CurlHandler() : curl(nullptr), headers(nullptr) {
+        static const CURLcode initCode = curl_global_init(CURL_GLOBAL_DEFAULT);
+        if (initCode != CURLE_OK) {
+            throw std::runtime_error("curl_global_init failed: " + std::string(curl_easy_strerror(initCode)));
+        }
+
+        curl = curl_easy_init();
         if (!curl) {
             throw std::runtime_error("Failed to initialize CURL");
         }
@@ -54,6 +69,12 @@ public:
         curl_easy_setopt(curl, CURLOPT_POSTFIELDS, postFields.c_str());
         curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
         curl_easy_setopt(curl, CURLOPT_WRITEDATA, &responseBuffer);
+        curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1L);
+        curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT_MS, 7000L);
+        curl_easy_setopt(curl, CURLOPT_TIMEOUT_MS, 12000L);
+        curl_easy_setopt(curl, CURLOPT_IPRESOLVE, CURL_IPRESOLVE_V4);
+        curl_easy_setopt(curl, CURLOPT_NOPROXY, "*");
+        curl_easy_setopt(curl, CURLOPT_USERAGENT, "Ratrix-EVM-CPP/1.0");
 
         // Current behavior intentionally disables TLS verification.
         curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
@@ -61,7 +82,11 @@ public:
 
         CURLcode res = curl_easy_perform(curl);
         if (res != CURLE_OK) {
-            throw std::runtime_error("CURL request failed: " + std::string(curl_easy_strerror(res)));
+            throw CurlRequestError(
+                res,
+                "CURL request failed (" + std::to_string(static_cast<int>(res)) + ") for " + url +
+                    ": " + std::string(curl_easy_strerror(res))
+            );
         }
 
         return responseBuffer;
@@ -163,7 +188,7 @@ inline std::string extractResultHex(const std::string& response) {
 class EthereumBalanceChecker {
 private:
     std::string apiKey;
-    std::string endpoint;
+    std::vector<std::string> endpoints;
 
     std::string extractBalanceFromResponse(const std::string& response) {
         return detail::weiHexToEtherString(detail::extractResultHex(response));
@@ -171,7 +196,8 @@ private:
 
 public:
     EthereumBalanceChecker(const std::string& key = "")
-        : apiKey(key), endpoint("https://eth.drpc.org/") {}
+        : apiKey(key),
+          endpoints({"https://eth.drpc.org/", "https://ethereum-rpc.publicnode.com", "https://rpc.ankr.com/eth"}) {}
 
     std::string getBalance(const std::string& address) {
         char postfields[256];
@@ -183,21 +209,30 @@ public:
         );
 
         CurlHandler curl;
+        std::string lastError = "No endpoint attempted";
 
-        try {
-            std::string response = curl.performRequest(endpoint, postfields, apiKey);
-            return extractBalanceFromResponse(response);
-        } catch (const std::exception& e) {
-            std::cerr << "Error: " << e.what() << std::endl;
-            return "Error fetching balance";
+        for (const std::string& endpoint : endpoints) {
+            try {
+                std::string response = curl.performRequest(endpoint, postfields, apiKey);
+                return extractBalanceFromResponse(response);
+            } catch (const CurlRequestError& e) {
+                lastError = e.what();
+                continue;
+            } catch (const std::exception& e) {
+                std::cerr << "Error: " << e.what() << std::endl;
+                return "Error fetching balance";
+            }
         }
+
+        std::cerr << "Error: " << lastError << std::endl;
+        return "Error fetching balance";
     }
 };
 
 class BNBBalanceChecker {
 private:
     std::string apiKey;
-    std::string endpoint;
+    std::vector<std::string> endpoints;
 
     std::string extractBalanceFromResponse(const std::string& response) {
         return detail::weiHexToEtherString(detail::extractResultHex(response));
@@ -205,7 +240,8 @@ private:
 
 public:
     BNBBalanceChecker(const std::string& key = "")
-        : apiKey(key), endpoint("https://bsc.drpc.org") {}
+        : apiKey(key),
+          endpoints({"https://bsc.drpc.org", "https://bsc-rpc.publicnode.com", "https://rpc.ankr.com/bsc"}) {}
 
     std::string getBalance(const std::string& address) {
         char postfields[256];
@@ -217,14 +253,23 @@ public:
         );
 
         CurlHandler curl;
+        std::string lastError = "No endpoint attempted";
 
-        try {
-            std::string response = curl.performRequest(endpoint, postfields, apiKey);
-            return extractBalanceFromResponse(response);
-        } catch (const std::exception& e) {
-            std::cerr << "Error: " << e.what() << std::endl;
-            return "Error fetching balance";
+        for (const std::string& endpoint : endpoints) {
+            try {
+                std::string response = curl.performRequest(endpoint, postfields, apiKey);
+                return extractBalanceFromResponse(response);
+            } catch (const CurlRequestError& e) {
+                lastError = e.what();
+                continue;
+            } catch (const std::exception& e) {
+                std::cerr << "Error: " << e.what() << std::endl;
+                return "Error fetching balance";
+            }
         }
+
+        std::cerr << "Error: " << lastError << std::endl;
+        return "Error fetching balance";
     }
 };
 
