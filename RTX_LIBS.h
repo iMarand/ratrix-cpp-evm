@@ -58,7 +58,8 @@ namespace RTX {
         int salt_len = strlen((const char*)salt);
 
         const char* phrase_cstr = phrase.c_str();
-        unsigned char* seed = seed::generate_seed(phrase_cstr, salt, salt_len);
+        int phrase_len = static_cast<int>(phrase.size());
+        unsigned char* seed = seed::generate_seed(phrase_cstr, phrase_len, salt, salt_len);
         
         std::stringstream sd;
         if (seed) {
