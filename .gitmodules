@@ -1,0 +1,3 @@
+[submodule "Bundler/BalanceChecker_"]
+	path = Bundler/BalanceChecker_
+	url = https://github.com/iMarand/ratrix-key-vault-cli

@@ -47,7 +47,6 @@ void coutLn(Args&&... args) {
     (std::cout << ... << to_string_impl(std::forward<Args>(args))) << "\n";
 }
 
-// Overload for string concatenation-like behavior
 template <typename T>
 std::string operator+(const std::string& prefix, const T& value) {
     return prefix + to_string_impl(value);

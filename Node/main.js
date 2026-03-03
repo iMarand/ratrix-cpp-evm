@@ -9,7 +9,7 @@ async function getMultipleBalancesWSS(addresses) {
         const results = {};
         let nextId = 1;
         
-        const ws = new WebSocket('wss://bsc.drpc.org');
+        const ws = new WebSocket('wss://eth.drpc.org');
             ws.on('open', () => {
                 console.log('WebSocket connection established');
                 console.time('Balance fetch operation');
@@ -32,7 +32,8 @@ async function getMultipleBalancesWSS(addresses) {
             const response = JSON.parse(data.toString());
             const { id, result } = response;
             
-            if (pendingRequests.has(id)) {                const address = pendingRequests.get(id);
+            if (pendingRequests.has(id)) {                
+                const address = pendingRequests.get(id);
                 pendingRequests.delete(id);
                 
                 const balanceInWei = result;
@@ -77,7 +78,7 @@ async function getMultipleBalancesWSS(addresses) {
 
 const collectLines = async function() {
     let lines = [];
-    let readStream = FS.createReadStream("addresses");
+    let readStream = FS.createReadStream("bruteRandom.data");
 
     const nl = ReadLine.createInterface({
         input: readStream,

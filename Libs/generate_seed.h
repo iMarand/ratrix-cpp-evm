@@ -1,6 +1,7 @@
 ﻿
 namespace seed {
-    unsigned char* generate_seed(const char* mnemonic, const unsigned char* salt, int salt_len) {
+    unsigned char* generate_seed(const char* mnemonic, int mnemonic_len, 
+                                const unsigned char* salt, int salt_len) {
         unsigned char* seed = (unsigned char*)OPENSSL_malloc(64);  // 64 bytes = 512 bits
         if (!seed) return NULL;
 
@@ -21,7 +22,8 @@ namespace seed {
         unsigned int keylen = 64;
 
         *p++ = OSSL_PARAM_construct_utf8_string("digest", const_cast<char*>("SHA512"), 0);
-        *p++ = OSSL_PARAM_construct_octet_string("pass", (void*)mnemonic, strlen(mnemonic));
+        // KEY CHANGE: Use mnemonic_len instead of strlen(mnemonic)
+        *p++ = OSSL_PARAM_construct_octet_string("pass", (void*)mnemonic, mnemonic_len);
         *p++ = OSSL_PARAM_construct_octet_string("salt", (void*)salt, salt_len);
         *p++ = OSSL_PARAM_construct_uint("iter", &iter);
         *p++ = OSSL_PARAM_construct_uint("keylen", &keylen);

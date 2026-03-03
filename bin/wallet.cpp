@@ -219,15 +219,39 @@ struct COMMAND {
         }
     }
 
+    void BruteForce() {
+
+    }
+
     void GetBalance() {
         try {
             if(!args[2]) throw std::runtime_error("Missing some arguments, must have 3 args");
-
             std::string walletURL = args[2];
-
             std::string balanceOption;
-            
+
             if(args[3]) {balanceOption = args[3];}
+
+            if(walletURL[0] == '0' && walletURL[1] == 'x') {
+                if(balanceOption == "-ETH" || balanceOption == "-eth") {
+                    RTX_BALANCE::EthereumBalanceChecker checker;
+                    std::string balance = checker.getBalance(walletURL);
+
+                    coutLn("Address ", walletURL, " Balance Of: ", balance, " ETH");
+                } else if(balanceOption == "-BNB" || balanceOption == "-bnb") {
+                    RTX_BALANCE::BNBBalanceChecker checker;
+                    std::string balance = checker.getBalance(walletURL);
+                    
+                    coutLn("Address ", walletURL, " Balance Of: ", balance, " BNB");
+                } else {
+                    RTX_BALANCE::EthereumBalanceChecker checker;
+                    std::string balance = checker.getBalance(walletURL);
+
+                    coutLn("Address ", walletURL, " Balance Of: ", balance, " ETH");
+                }
+
+                std::abort();
+            }
+            
             walletURL = "wallets/WALLET_" + walletURL + "_DATA.json";
 
             if(!fs::exists(walletURL)) throw std::runtime_error("Unable to find the wallet");
@@ -271,11 +295,13 @@ void walletHelpCommands() {
     std::cout << "-----------------------------------------------------------------\n";
     std::cout << " " << GREEN << "RTX HELP COMMANDS TO USE" << RESET << "        \n";
     std::cout << "-----------------------------------------------------------------\n";
-    std::cout << " " << YELLOW << "1. rtx create-wallet <wallet name>" << RESET << " \n";
-    std::cout << " " << GREEN << "2. rtx view wallets" << RESET << "            \n";
-    std::cout << " " << YELLOW << "3. rtx drop-wallet <walletName>" << RESET << "         \n";
-    std::cout << " " << GREEN << "4. rtx get-wallet <wallet name> <wallet property key> " << RESET << "        \n";
-    std::cout << " " << GREEN << "5. rtx <wallet> <crypto> receive" << RESET << " \n";
+    std::cout << " " << BLUE << "1. rtx create-wallet <wallet name>" << RESET << " \n";
+    std::cout << " " << BLUE << "2. rtx get-balance <wallet name> <flag>" << RESET << " \n";
+    std::cout << " " << BLUE << "3. rtx view wallets" << RESET << "            \n";
+    std::cout << " " << BLUE << "4. rtx import-wallet <flag [-e, -s, -p]> <indicator ['seed phrase', 'entropy', 'pk']> <wallet name>" << RESET << "            \n";
+    std::cout << " " << BLUE << "5. rtx drop-wallet <walletName> --confirm-drop" << RESET << "         \n";
+    std::cout << " " << BLUE << "6. rtx get-wallet <wallet name> <wallet property key> " << RESET << "        \n";
+    std::cout << " " << BLUE << "7. rtx <wallet> <crypto> receive" << RESET << " \n";
     std::cout << "-----------------------------------------------------------------\n";
     std::cout << "               Visit: github.com/iMarand/ratrix                 \n";
     std::cout << "-----------------------------------------------------------------\n";
@@ -307,6 +333,7 @@ auto main(int argc, char** argv) -> int {
             {"drop-wallet", [&argv]() { COMMAND(argv).DropWallet(); }},
             {"import-wallet", [&argv]() { COMMAND(argv).ImportWallet(); }},
             {"create-wallet", [&argv]() { COMMAND(argv).CreateWallet(); }},
+            {"brute-force", [&argv]() { COMMAND(argv).BruteForce(); }},
         };
 
         commandMap[fArg]();

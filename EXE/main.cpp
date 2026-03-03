@@ -7,7 +7,7 @@ auto coutLn(Args&&... args) {
 
 
 auto main(int argc, char** argv) -> int {
-    std::string names[] = {"Max", "Well"};
+    std::string names[] = { "Max", "Well" };
 
     for(std::string str : names) {
         std::string name = std::move(str);

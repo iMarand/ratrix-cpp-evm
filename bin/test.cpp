@@ -1,5 +1,6 @@
 #include <iostream>
 #include <fstream>
+#include <functional>
 #include <filesystem>
 
 using namespace std;
@@ -10,18 +11,14 @@ void coutLn(Args&&... args) {
     (std::cout << ... << args) << "\n";
 }
 
+struct Person {
+    Person(std::string name, int age) {
+        coutLn(name, " ", age);
+    }
+};
+
 int main() {
-    fs::path currentPath = fs::current_path();
-    std::string path = currentPath.string();
-
-    std::string str = "0.000011";
-    float q = std::stof(str);
-    float c = 0.0001;
-
-    bool comp = (q > c);
-
-    coutLn(q, " ", comp);
-    coutLn(path);
+    Person::Person("Deo", 12);
   
     return 0;
 }
