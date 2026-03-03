@@ -1,87 +1,137 @@
-#!/bin/bash
+#!/usr/bin/env bash
+set -euo pipefail
 
+# Cross-platform g++ build helper for Windows (MSYS2/MinGW) + Linux
+# Usage:
+#   ./build/gpp.sh <source1.cpp> [source2.cpp ...] <output_name> [--debug]
+#   ./build/gpp.sh <source.cpp> --debug              (build+run temp binary)
 
-# g++ "$1" -o "${2:-app.exe}" $(pkg-config --cflags --libs Qt6Widgets Qt6Gui Qt6Core Qt6Network Qt6Multimedia Qt6MultimediaWidgets Qt6Sql libcurl openssl) -I/mingw64/include/boost -L/mingw64/lib -lboost_thread-mt -lboost_filesystem-mt -pthread -lpthread -lshell32 -lpcre2-8 -lprotobuf -lsqlite3
-# g++ app.cpp -o app.exe $(pkg-config --cflags --libs drogon)
-
-
-# g++ "$1" -o "${2:-app}" -IC:/msys64/mingw64/include/qt6/QtWidgets -IC:/msys64/mingw64/include/qt6 -DQT_WIDGETS_LIB -IC:/msys64/mingw64/include/qt6/QtGui -DQT_GUI_LIB -IC:/msys64/mingw64/include/qt6/QtNetwork -DQT_NETWORK_LIB -IC:/msys64/mingw64/include/qt6/QtSql -DQT_SQL_LIB -IC:/msys64/mingw64/include/qt6/QtCore -DQT_CORE_LIB -IC:/msys64/mingw64/share/qt6/mkspecs/win32-g++ -DWIN32 -D_ENABLE_EXTENDED_ALIGNED_STORAGE -DWIN64 -D_WIN64 -DMINGW_HAS_SECURE_API=1 -D_WIN32_WINNT=0x0A00 -DWINVER=0x0A00 -lQt6Widgets -lQt6Gui -lQt6Network -lQt6Sql -lQt6Core -L/mingw64/lib -lcurl -lssl -lcrypto -luser32 -lws2_32 -lboost_thread-mt -lboost_filesystem-mt -pthread
-# g++ "$1" -o "${2:-app}" -IC:/msys64/mingw64/include/qt6/QtWidgets -IC:/msys64/mingw64/include/qt6 -DQT_WIDGETS_LIB -IC:/msys64/mingw64/include/qt6/QtGui -DQT_GUI_LIB -IC:/msys64/mingw64/include/qt6/QtNetwork -DQT_NETWORK_LIB -IC:/msys64/mingw64/include/qt6/QtSql -DQT_SQL_LIB -IC:/msys64/mingw64/include/qt6/QtCore -DQT_CORE_LIB -IC:/msys64/mingw64/share/qt6/mkspecs/win32-g++ -DWIN32 -D_ENABLE_EXTENDED_ALIGNED_STORAGE -DWIN64 -D_WIN64 -DMINGW_HAS_SECURE_API=1 -D_WIN32_WINNT=0x0A00 -DWINVER=0x0A00 -lQt6Widgets -lQt6Gui -lQt6Network -lQt6Sql -lQt6Core -L/mingw64/lib -lcurl -lssl -lcrypto -luser32 -lws2_32 -lboost_thread-mt -lboost_filesystem-mt -pthread
-
-
-# g++ "$1" -o "${2:-app}" -lcurl -lssl -lcrypto -I/mingw64/include -L/mingw64/lib
-
-
-
-
-
-# ---------------------------------Build Scratch (Debug Mode Added) -------------------------------------------------------
-
-
-if [ $# -lt 1 ]; then
-    echo "Usage: $0 <source1.cpp> [source2.cpp ...] [output_name|--debug]"
-    exit 1
+if [[ $# -lt 1 ]]; then
+  echo "Usage: $0 <source1.cpp> [source2.cpp ...] [output_name|--debug]"
+  exit 1
 fi
 
+# ---------- Parse args ----------
 DEBUG_MODE=false
 SRC_ARRAY=()
 
 for arg in "$@"; do
-    if [[ "$arg" == "--debug" ]]; then
-        DEBUG_MODE=true
-    elif [[ "$arg" == *" "* ]]; then
-        read -ra SPLIT <<< "$arg"
-        SRC_ARRAY+=("${SPLIT[@]}")
-    else
-        SRC_ARRAY+=("$arg")
-    fi
+  if [[ "$arg" == "--debug" ]]; then
+    DEBUG_MODE=true
+  else
+    SRC_ARRAY+=("$arg")
+  fi
 done
 
-if [ "$DEBUG_MODE" = true ]; then
-    OUT="/tmp/debug_$(basename "${SRC_ARRAY[0]}" .cpp)_$$"
-    SRC=("${SRC_ARRAY[@]}")
+if [[ "${#SRC_ARRAY[@]}" -lt 1 ]]; then
+  echo "Error: No sources provided."
+  exit 1
+fi
+
+if [[ "$DEBUG_MODE" == true ]]; then
+  OUT="/tmp/debug_$(basename "${SRC_ARRAY[0]}" .cpp)_$$"
+  SRC=("${SRC_ARRAY[@]}")
 else
-    OUT="${SRC_ARRAY[-1]}"
-    SRC=("${SRC_ARRAY[@]:0:${#SRC_ARRAY[@]}-1}")
+  if [[ "${#SRC_ARRAY[@]}" -lt 2 ]]; then
+    echo "Error: Provide an output name as the last argument (or use --debug)."
+    exit 1
+  fi
+  OUT="${SRC_ARRAY[-1]}"
+  SRC=("${SRC_ARRAY[@]:0:${#SRC_ARRAY[@]}-1}")
 fi
 
-# PKG_FLAGS=$(pkg-config --cflags --libs Qt6Widgets Qt6Gui Qt6Core Qt6Network Qt6Multimedia Qt6MultimediaWidgets Qt6Sql libcurl openssl protobuf absl_base absl_log_internal_message 2>/dev/null)
-# EXTRA_FLAGS="-I/mingw64/include/boost -L/mingw64/lib"
-# MANUAL_LIBS="-lboost_thread-mt -lboost_filesystem-mt -lpcre2-8 -pthread -lshell32 -lsqlite3"
+# ---------- OS detection ----------
+UNAME="$(uname -s 2>/dev/null || echo Unknown)"
+IS_WINDOWS=false
+case "$UNAME" in
+  MINGW*|MSYS*|CYGWIN*) IS_WINDOWS=true ;;
+esac
 
-PKG_FLAGS=$(pkg-config --cflags --libs Qt6Widgets Qt6Gui Qt6Core Qt6Network Qt6Multimedia Qt6MultimediaWidgets Qt6Sql libcurl openssl protobuf grpc++ grpc absl_base absl_log_internal_message 2>/dev/null)
-EXTRA_FLAGS="-I/mingw64/include/boost -I/mingw64/include/grpcpp -L/mingw64/lib"
-MANUAL_LIBS="-lboost_thread-mt -lboost_filesystem-mt -lgrpc++ -lgrpc -lgrpc++_reflection -lpcre2-8 -pthread -lshell32 -lsqlite3"
+# ---------- Helpers ----------
+have_pkg() { pkg-config --exists "$1" 2>/dev/null; }
 
-if [ "$DEBUG_MODE" = true ]; then
-    EXTRA_FLAGS="$EXTRA_FLAGS -g"
-    echo "==============================================================================="
-    echo "|| 🐛 Debug mode enabled"
+pkg_flags_for() {
+  # Print flags for packages that exist (ignore missing)
+  local pkgs=("$@")
+  local existing=()
+  for p in "${pkgs[@]}"; do
+    if have_pkg "$p"; then existing+=("$p"); fi
+  done
+  if ((${#existing[@]})); then
+    pkg-config --cflags --libs "${existing[@]}" 2>/dev/null
+  fi
+}
+
+# ---------- Build flags ----------
+# Packages you *might* have installed. We only use those present.
+PKG_FLAGS="$(
+  pkg_flags_for \
+    Qt6Widgets Qt6Gui Qt6Core Qt6Network Qt6Multimedia Qt6MultimediaWidgets Qt6Sql \
+    libcurl openssl protobuf grpc++ grpc absl_base absl_log_internal_message
+)"
+
+# Extra include/lib paths only needed for MSYS2/MinGW setups.
+EXTRA_FLAGS=""
+MANUAL_LIBS=""
+
+if [[ "$IS_WINDOWS" == true ]]; then
+  # Windows (MSYS2/MinGW) names/paths
+  EXTRA_FLAGS="-I/mingw64/include/boost -I/mingw64/include/grpcpp -L/mingw64/lib"
+  MANUAL_LIBS="-lboost_thread-mt -lboost_filesystem-mt -lgrpc++ -lgrpc -lgrpc++_reflection -lpcre2-8 -pthread -lshell32 -lsqlite3 -lws2_32 -luser32"
+  # Common output extension for Windows if user didn't add one
+  if [[ "$DEBUG_MODE" == false && "$OUT" != *.exe ]]; then
+    OUT="${OUT}.exe"
+  fi
+else
+  # Linux (and most Unix) names/paths
+  # No mingw64 includes, no shell32/user32
+  EXTRA_FLAGS=""
+  MANUAL_LIBS="-lboost_thread -lboost_filesystem -lgrpc++ -lgrpc -lgrpc++_reflection -lpcre2-8 -pthread -lsqlite3"
 fi
 
+# Debug
+if [[ "$DEBUG_MODE" == true ]]; then
+  EXTRA_FLAGS="$EXTRA_FLAGS -g"
+  echo "==============================================================================="
+  echo "|| 🐛 Debug mode enabled"
+fi
+
+echo "|| 🖥️  OS: $UNAME"
 echo "|| 🔧 Compiling sources: ${SRC[*]}"
 echo "|| ➡️ Output: $OUT"
 
+# ---------- Compile ----------
+# Note: If you don't have some libs installed, remove them from MANUAL_LIBS or install dev packages.
+set +e
 g++ -std=c++17 "${SRC[@]}" -o "$OUT" $PKG_FLAGS $EXTRA_FLAGS $MANUAL_LIBS
+RC=$?
+set -e
 
-if [ $? -eq 0 ]; then
-    echo "|| ✅ Build successful: $OUT"
-    
-    if [ "$DEBUG_MODE" = true ]; then
-        echo "|| 🚀 Running in debug mode..."
-        echo "==============================================================================="
-        echo ""
+if [[ $RC -ne 0 ]]; then
+  echo "❌ Build failed"
+  echo
+  echo "Tips:"
+  if [[ "$IS_WINDOWS" == true ]]; then
+    echo "  - Ensure MSYS2 packages exist: mingw-w64-x86_64-boost, mingw-w64-x86_64-curl, mingw-w64-x86_64-openssl, mingw-w64-x86_64-grpc, mingw-w64-x86_64-protobuf, etc."
+  else
+    echo "  - Install dev packages (Ubuntu/Debian):"
+    echo "      sudo apt update && sudo apt install -y build-essential pkg-config libcurl4-openssl-dev libssl-dev libboost-thread-dev libboost-filesystem-dev libpcre2-dev libsqlite3-dev"
+    echo "  - If you don't use grpc/protobuf/qt in this build, remove them from MANUAL_LIBS / PKG_FLAGS."
+  fi
+  exit 1
+fi
 
-        "$OUT"
-        EXIT_CODE=$?
-        
-        rm -f "$OUT"
-        
-        echo ""
-        echo "🏁 Program exited with code: $EXIT_CODE"
-        exit $EXIT_CODE
-    fi
-else
-    echo "❌ Build failed"
-    exit 1
+echo "|| ✅ Build successful: $OUT"
+
+# ---------- Run in debug mode ----------
+if [[ "$DEBUG_MODE" == true ]]; then
+  echo "|| 🚀 Running in debug mode..."
+  echo "==============================================================================="
+  echo ""
+  "$OUT"
+  EXIT_CODE=$?
+  rm -f "$OUT"
+  echo ""
+  echo "🏁 Program exited with code: $EXIT_CODE"
+  exit $EXIT_CODE
 fi
