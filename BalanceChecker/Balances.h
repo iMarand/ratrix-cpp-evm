@@ -1,3 +1,5 @@
+#pragma once
+
 #include <cctype>
 #include <cstdio>
 #include <curl/curl.h>

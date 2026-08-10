@@ -1,0 +1,72 @@
+# ==============================================================
+#  Ratrix EVM C++ - ignore rules
+# ==============================================================
+
+# --- Secrets / local config -----------------------------------
+# .env is #include-d as C++ (holds _PRIVATE_KEY_ / _ADDRESS_). Keep it local.
+.env
+*.env
+Bundler/.env
+.env.*
+!.env.example
+
+# --- Compiled binaries ----------------------------------------
+*.exe
+*.out
+*.app
+threads-choose
+threads-choose.exe
+
+# --- Object / intermediate build files ------------------------
+*.o
+*.obj
+*.a
+*.lib
+*.d
+*.gch
+*.pch
+/tmp/
+debug_*
+
+# --- Shared libraries (shipped by MSYS2/MinGW, not source) -----
+*.dll
+*.so
+*.so.*
+*.dylib
+
+# --- Program output / scan data -------------------------------
+# Generated wallets, matches and full scan logs - can be huge and are secret.
+*.data
+*.scan.*
+*.csv
+*.cvs
+yasmarang.found.data
+yasmarang.scan.csv
+yasmarang.unchecked.data
+found.txt
+brute.data
+bruteRandom.data
+bruteRandomPrivate.data
+bin/wallets/*.json
+
+# --- Node -----------------------------------------------------
+node_modules/
+Node/node_modules/
+npm-debug.log*
+yarn-error.log*
+package-lock.json
+
+# --- Editor / OS ----------------------------------------------
+.vscode/*
+!.vscode/settings.json
+!.vscode/c_cpp_properties.json
+.idea/
+*.swp
+*~
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# --- Keep large data headers, ignore accidental copies --------
+*.log
+*.tmp
