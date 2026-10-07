@@ -1,0 +1,13 @@
+<RCC>
+    <qresource prefix="/brand">
+        <file alias="logo-512.png">brand/logo-512.png</file>
+        <file alias="logo-256.png">brand/logo-256.png</file>
+        <file alias="logo-128.png">brand/logo-128.png</file>
+        <file alias="logo-64.png">brand/logo-64.png</file>
+        <file alias="logo-48.png">brand/logo-48.png</file>
+        <file alias="logo-32.png">brand/logo-32.png</file>
+        <file alias="mini-24.png">brand/mini-24.png</file>
+        <file alias="mini-20.png">brand/mini-20.png</file>
+        <file alias="mini-16.png">brand/mini-16.png</file>
+    </qresource>
+</RCC>

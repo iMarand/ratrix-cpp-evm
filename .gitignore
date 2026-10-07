@@ -47,7 +47,17 @@ found.txt
 brute.data
 bruteRandom.data
 bruteRandomPrivate.data
-bin/wallets/*.json
+
+# --- Wallets & secrets (never commit) -------------------------
+# Encrypted wallet files are per-user; plaintext legacy wallets are sensitive.
+*.rtxwallet
+legacy/old-wallets-PLAINTEXT/
+DOTENV_*
+
+# --- CMake build dir ------------------------------------------
+/build-dev/
+/build/CMakeCache.txt
+/build/CMakeFiles/
 
 # --- Node -----------------------------------------------------
 node_modules/
@@ -70,3 +80,15 @@ desktop.ini
 # --- Keep large data headers, ignore accidental copies --------
 *.log
 *.tmp
+
+# --- Release output (portable folder + installers; never source) ----
+/dist/
+
+# --- Wallet data (plaintext/legacy wallet exports are sensitive) -----
+*_DATA.json
+/bin/
+
+# --- Quarantined legacy scanner code (NOT part of the wallet product) ---
+# The brute-force / collision-scanner half is kept locally only and is not
+# distributed with the wallet. Source stays on disk; git does not track it.
+/legacy/
