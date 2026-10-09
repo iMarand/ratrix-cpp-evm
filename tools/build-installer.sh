@@ -6,7 +6,9 @@
 set -euo pipefail
 export PATH=/c/msys64/mingw64/bin:$PATH
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-VER="${VERSION:-1.0.0}"
+# Version: $VERSION if set, else the one in CMakeLists.txt (single source).
+VER="${VERSION:-$(sed -n 's/^project(Ratrix VERSION \([0-9.]*\).*/\1/p' "$REPO/CMakeLists.txt")}"
+[ -n "$VER" ] || { echo "could not read the version from CMakeLists.txt"; exit 1; }
 MODE="${1:-both}"   # all | peruser | both
 EXE="$REPO/build-dev/gui/RatrixWallet.exe"
 DIST="$REPO/dist/RatrixWallet"

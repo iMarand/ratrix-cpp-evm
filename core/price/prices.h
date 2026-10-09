@@ -25,7 +25,8 @@ struct Quote {
 inline const std::vector<std::pair<std::string, std::string>>& coins() {
     static const std::vector<std::pair<std::string, std::string>> c = {
         {"bitcoin", "BTC"},   {"ethereum", "ETH"}, {"binancecoin", "BNB"},
-        {"tether", "USDT"},   {"usd-coin", "USDC"}};
+        {"tron", "TRX"},      {"solana", "SOL"},   {"tether", "USDT"},
+        {"usd-coin", "USDC"}};
     return c;
 }
 

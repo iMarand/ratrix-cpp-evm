@@ -2,24 +2,29 @@
 set -euo pipefail
 
 # Builds the Ratrix Wallet CLI (app/main.cpp) -> ratrix(.exe) in the repo root.
+# Goes through CMake so the vendored libsecp256k1 (transaction signing for
+# `ratrix send`) is built and linked statically, the same way as for the GUI.
 
 cd "$(dirname "$0")/.."
 ROOT="$(pwd)"
-SRC="app/main.cpp"
 
 UNAME="$(uname -s 2>/dev/null || echo Unknown)"
 case "$UNAME" in
   MINGW*|MSYS*|CYGWIN*)
     [[ -d /c/msys64/mingw64/bin ]] && export PATH="/c/msys64/mingw64/bin:$PATH"
-    OUT="$ROOT/ratrix.exe"
-    LIBS="-lcurl -lssl -lcrypto -lws2_32 -lcrypt32 -lwldap32 -lz"
+    EXE="ratrix.exe"
     ;;
   *)
-    OUT="$ROOT/ratrix"
-    LIBS="-lcurl -lssl -lcrypto -lz -pthread"
+    EXE="ratrix"
     ;;
 esac
 
-echo "|| Compiling $SRC -> $OUT"
-g++ -std=c++17 -O2 "$SRC" -o "$OUT" $LIBS
-echo "|| Built: $OUT"
+GEN=()
+if [[ ! -f build-cli/CMakeCache.txt ]] && command -v ninja >/dev/null; then GEN=(-G Ninja); fi
+
+echo "|| Configuring build-cli/"
+cmake -S . -B build-cli "${GEN[@]}" -DCMAKE_BUILD_TYPE=Release -DRATRIX_BUILD_CLI=ON -DRATRIX_BUILD_GUI=OFF >/dev/null
+echo "|| Compiling app/main.cpp"
+cmake --build build-cli --target ratrix
+cp "build-cli/$EXE" "$ROOT/$EXE"
+echo "|| Built: $ROOT/$EXE"

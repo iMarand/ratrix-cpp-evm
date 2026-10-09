@@ -11,6 +11,10 @@
 #include <string>
 #include <vector>
 
+#include <openssl/bn.h>
+
+#include "../net/endpoints.h"
+
 class CurlRequestError : public std::runtime_error {
 public:
     explicit CurlRequestError(CURLcode errorCode, const std::string& message)
@@ -100,6 +104,12 @@ public:
                 "CURL request failed (" + std::to_string(static_cast<int>(res)) + ") for " + url +
                     ": " + std::string(curl_easy_strerror(res))
             );
+        }
+
+        long status = 0;
+        curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &status);
+        if (status < 200 || status >= 300) {
+            throw std::runtime_error("HTTP " + std::to_string(status) + " from " + url);
         }
 
         return responseBuffer;
@@ -196,93 +206,72 @@ inline std::string extractResultHex(const std::string& response) {
     return response.substr(valueStart, valueEnd - valueStart);
 }
 
+// Scales a base-10 integer by 10^decimals into a decimal string, exactly (no
+// floating point): formatUnits("1500000", 6) == "1.50". Keeps >= 2 decimals.
+inline std::string formatUnits(std::string digits, int decimals) {
+    if (digits.empty()) digits = "0";
+    if (decimals <= 0) return digits;
+    if ((int)digits.size() <= decimals) digits.insert(0, decimals - digits.size() + 1, '0');
+    std::string whole = digits.substr(0, digits.size() - decimals);
+    std::string frac = digits.substr(digits.size() - decimals);
+    while (frac.size() > 2 && frac.back() == '0') frac.pop_back();
+    return whole + "." + frac;
+}
+
+// Same for a JSON-RPC hex quantity, e.g. "0x1bc16d674ec80000".
+inline std::string formatHexUnits(const std::string& rawHex, int decimals) {
+    std::string hex = (rawHex.rfind("0x", 0) == 0 || rawHex.rfind("0X", 0) == 0) ? rawHex.substr(2) : rawHex;
+    if (hex.empty()) hex = "0";
+    BIGNUM* bn = nullptr;
+    if (BN_hex2bn(&bn, hex.c_str()) != (int)hex.size()) {
+        if (bn) BN_free(bn);
+        throw std::runtime_error("Invalid hex quantity: " + shortResponse(rawHex));
+    }
+    char* dec = BN_bn2dec(bn);
+    std::string digits = dec ? dec : "0";
+    OPENSSL_free(dec);
+    BN_free(bn);
+    return formatUnits(digits, decimals);
+}
+
+// eth_getBalance against each endpoint in turn until one gives a real answer.
+// Any failure (no connection, an HTTP error page, or a JSON-RPC error such as
+// a rate limit or "API key required") moves on to the next endpoint. Throws
+// the last error if every endpoint fails.
+inline std::string rpcBalance(const std::vector<std::string>& endpoints, const std::string& address, int decimals) {
+    const std::string body =
+        "{\"jsonrpc\":\"2.0\",\"method\":\"eth_getBalance\",\"params\":[\"" + address + "\",\"latest\"],\"id\":1}";
+    CurlHandler curl;
+    std::string lastError = "no endpoint attempted";
+    for (const std::string& endpoint : endpoints) {
+        try {
+            return formatHexUnits(extractResultHex(curl.performRequest(endpoint, body, "")), decimals);
+        } catch (const std::exception& e) {
+            lastError = e.what();
+        }
+    }
+    throw std::runtime_error(lastError);
+}
+
 } // namespace detail
 
+// Native balances as decimal strings, e.g. "0.0421". Both throw if every
+// endpoint fails.
 class EthereumBalanceChecker {
-private:
-    std::string apiKey;
-    std::vector<std::string> endpoints;
-
-    std::string extractBalanceFromResponse(const std::string& response) {
-        return detail::weiHexToEtherString(detail::extractResultHex(response));
-    }
-
 public:
-    EthereumBalanceChecker(const std::string& key = "")
-        : apiKey(key),
-          endpoints({"https://eth.drpc.org/", "https://ethereum-rpc.publicnode.com", "https://rpc.ankr.com/eth"}) {}
+    explicit EthereumBalanceChecker(const std::string& /*apiKey*/ = "") {}
 
     std::string getBalance(const std::string& address) {
-        char postfields[256];
-        std::snprintf(
-            postfields,
-            sizeof(postfields),
-            "{\"jsonrpc\":\"2.0\",\"method\":\"eth_getBalance\",\"params\":[\"%s\",\"latest\"],\"id\":1}",
-            address.c_str()
-        );
-
-        CurlHandler curl;
-        std::string lastError = "No endpoint attempted";
-
-        for (const std::string& endpoint : endpoints) {
-            try {
-                std::string response = curl.performRequest(endpoint, postfields, apiKey);
-                return extractBalanceFromResponse(response);
-            } catch (const CurlRequestError& e) {
-                lastError = e.what();
-                continue;
-            } catch (const std::exception& e) {
-                std::cerr << "Error: " << e.what() << std::endl;
-                return "Error fetching balance";
-            }
-        }
-
-        std::cerr << "Error: " << lastError << std::endl;
-        return "Error fetching balance";
+        return detail::rpcBalance(rtxnet::endpoints::eth(), address, 18);
     }
 };
 
 class BNBBalanceChecker {
-private:
-    std::string apiKey;
-    std::vector<std::string> endpoints;
-
-    std::string extractBalanceFromResponse(const std::string& response) {
-        return detail::weiHexToEtherString(detail::extractResultHex(response));
-    }
-
 public:
-    BNBBalanceChecker(const std::string& key = "")
-        : apiKey(key),
-          endpoints({"https://bsc.drpc.org", "https://bsc-rpc.publicnode.com", "https://rpc.ankr.com/bsc"}) {}
+    explicit BNBBalanceChecker(const std::string& /*apiKey*/ = "") {}
 
     std::string getBalance(const std::string& address) {
-        char postfields[256];
-        std::snprintf(
-            postfields,
-            sizeof(postfields),
-            "{\"jsonrpc\":\"2.0\",\"method\":\"eth_getBalance\",\"params\":[\"%s\",\"latest\"],\"id\":1}",
-            address.c_str()
-        );
-
-        CurlHandler curl;
-        std::string lastError = "No endpoint attempted";
-
-        for (const std::string& endpoint : endpoints) {
-            try {
-                std::string response = curl.performRequest(endpoint, postfields, apiKey);
-                return extractBalanceFromResponse(response);
-            } catch (const CurlRequestError& e) {
-                lastError = e.what();
-                continue;
-            } catch (const std::exception& e) {
-                std::cerr << "Error: " << e.what() << std::endl;
-                return "Error fetching balance";
-            }
-        }
-
-        std::cerr << "Error: " << lastError << std::endl;
-        return "Error fetching balance";
+        return detail::rpcBalance(rtxnet::endpoints::bsc(), address, 18);
     }
 };
 

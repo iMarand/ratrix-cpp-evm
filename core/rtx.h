@@ -28,6 +28,8 @@
 #include "seed_to_pk.h"
 #include "toSeedPhrase.h"
 #include "bitcoin.h"
+#include "tron.h"
+#include "solana.h"
 #include "balance/Balances.h"
 
 template <typename T>

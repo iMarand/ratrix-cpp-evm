@@ -37,6 +37,8 @@ struct Palette {
     QColor btc{"#f7931a"};
     QColor usdt{"#26a17b"};
     QColor usdc{"#2775ca"};
+    QColor trx{"#eb0029"};
+    QColor sol{"#9945ff"};
 };
 
 const Palette& pal();

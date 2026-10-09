@@ -15,7 +15,7 @@
 
 #include <openssl/sha.h>
 
-#include "../bitcoin.h"  // btc::sha256, hash160, base58, bech32 (encode)
+#include "../bitcoin.h"  // btc::sha256, hash160, base58 (encode/decode), bech32 (encode)
 #include "signer.h"
 
 namespace rtxsend::btc {
@@ -50,35 +50,6 @@ inline void putVarBytes(Bytes& b, const Bytes& x) {
 // ---- address -> scriptPubKey -------------------------------------------------
 
 namespace detail {
-inline Bytes base58decodeCheck(const std::string& s) {
-    static const char* A = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
-    std::vector<int> b256;
-    size_t zeros = 0;
-    while (zeros < s.size() && s[zeros] == '1') ++zeros;
-    std::vector<uint8_t> num;
-    for (char c : s) {
-        const char* p = std::char_traits<char>::find(A, 58, c);
-        if (!p) throw std::runtime_error("Not a valid Base58 address");
-        int carry = static_cast<int>(p - A);
-        for (auto it = num.rbegin(); it != num.rend(); ++it) {
-            carry += 58 * (*it);
-            *it = carry & 0xff;
-            carry >>= 8;
-        }
-        while (carry) {
-            num.insert(num.begin(), carry & 0xff);
-            carry >>= 8;
-        }
-    }
-    Bytes out(zeros, 0x00);
-    out.insert(out.end(), num.begin(), num.end());
-    if (out.size() < 5) throw std::runtime_error("Address too short");
-    Bytes payload(out.begin(), out.end() - 4);
-    const Bytes chk = dsha256(payload);
-    if (!std::equal(out.end() - 4, out.end(), chk.begin())) throw std::runtime_error("Bad address checksum");
-    return payload;  // version byte + hash
-}
-
 // BIP173 bech32 decode -> (witness version, program bytes). Supports v0 only.
 inline bool bech32Decode(const std::string& addr, const std::string& hrp, int& witver, Bytes& program) {
     static const char* CHARSET = "qpzry9x8gf2tvdw0s3jn54khce6mua7l";
@@ -126,7 +97,7 @@ inline Bytes scriptForAddress(const std::string& addr, const std::string& hrp = 
         putBytes(spk, program);
         return spk;
     }
-    const Bytes payload = detail::base58decodeCheck(addr);
+    const Bytes payload = ::btc::base58CheckDecode(addr);  // version byte + hash
     const uint8_t ver = payload[0];
     const Bytes hash(payload.begin() + 1, payload.end());
     if (hash.size() != 20) throw std::runtime_error("Unsupported address");

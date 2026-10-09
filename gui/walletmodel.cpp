@@ -13,8 +13,11 @@
 #include <thread>
 
 #include "../core/rtx.h"
+#include "../core/address_kind.h"
 #include "../core/balance/BtcBalance.h"
+#include "../core/balance/SolBalance.h"
 #include "../core/balance/TokenBalance.h"
+#include "../core/balance/TronBalance.h"
 #include "../core/price/prices.h"
 #include "../core/send/send.h"
 #include "../app/walletstore.h"
@@ -28,6 +31,10 @@ QString chainLabel(Chain c) {
         case Chain::Btc: return "BTC";
         case Chain::UsdtEth: return "USDT";
         case Chain::UsdcEth: return "USDC";
+        case Chain::Trx: return "TRX";
+        case Chain::UsdtTrx: return "USDT";
+        case Chain::Sol: return "SOL";
+        case Chain::UsdtSol: return "USDT";
     }
     return "?";
 }
@@ -39,7 +46,18 @@ static WalletView toView(const store::Wallet& w) {
     v.eth = QString::fromStdString(w.eth);
     v.btcSegwit = QString::fromStdString(w.btcSegwit);
     v.btcLegacy = QString::fromStdString(w.btcLegacy);
+    v.tron = QString::fromStdString(w.tron);
+    v.sol = QString::fromStdString(w.sol);
     v.encrypted = w.encrypted;
+    // Wallets saved before Tron support: their Tron address is just the EVM
+    // one re-encoded (same key). Not for watch-only, which tracks exactly the
+    // address the user entered.
+    if (v.tron.isEmpty() && w.encrypted && !w.eth.empty()) {
+        try {
+            v.tron = QString::fromStdString(tron::fromEvmAddress(w.eth));
+        } catch (const std::exception&) {
+        }
+    }
     return v;
 }
 
@@ -51,6 +69,16 @@ static store::Wallet fromPriv(const std::string& name, const std::string& type, 
     w.eth = RTX::toAddress(priv);
     w.btcSegwit = RTX::toBtcAddress(priv);
     w.btcLegacy = RTX::toBtcLegacyAddress(priv);
+    w.tron = tron::fromEvmAddress(w.eth);
+    return w;
+}
+
+// Same, for a wallet with a recovery phrase: also gets a Solana address.
+static store::Wallet fromSeed(const std::string& name, const std::string& type, const std::string& seedHex,
+                              std::string& privOut) {
+    privOut = RTX::toPrivateKey(seedHex);
+    store::Wallet w = fromPriv(name, type, privOut);
+    w.sol = sol::addressFromSeed(seedHex);
     return w;
 }
 
@@ -68,7 +96,27 @@ bool WalletModel::unlockApp(const QString& passphrase) {
     if (!store::verifyApp(passphrase.toStdString())) return false;
     sessionPass_ = passphrase.toStdString();
     unlocked_ = true;
+    addMissingAddresses();
     return true;
+}
+
+// Wallets created before Solana support have no Solana address. It comes from
+// the recovery phrase, which is encrypted, so derive it once here while the
+// passphrase is at hand and store it with the other public addresses. Runs
+// once per wallet; afterwards the address is already there.
+void WalletModel::addMissingAddresses() {
+    for (const auto& name : store::list()) {
+        try {
+            const store::Wallet w = store::meta(store::loadRaw(name));
+            if (!w.encrypted || !w.sol.empty() || w.type == "IMPORTED_PK") continue;
+            store::Secret s = store::unlock(name, sessionPass_);
+            if (!s.seedPhrase.empty()) store::setAddress(name, "sol", sol::addressFromSeed(RTX::toSeed(s.seedPhrase)));
+            for (std::string* f : {&s.privateKey, &s.seedPhrase, &s.entropy}) f->assign(f->size(), '\0');
+        } catch (const std::exception&) {
+            // Unreadable, or sealed with another passphrase (e.g. made by the
+            // CLI): leave it as it is.
+        }
+    }
 }
 
 int WalletModel::encryptedCount() const {
@@ -124,8 +172,8 @@ WalletView WalletModel::createFromPhrase(const QString& name, const QString& phr
     if (!unlocked_) throw std::runtime_error("App is locked");
     std::string p = phrase.trimmed().toStdString();
     if (p.empty()) throw std::runtime_error("Recovery phrase cannot be empty");
-    std::string priv = RTX::toPrivateKey(RTX::toSeed(p));
-    store::Wallet w = fromPriv(name.toStdString(), "HD", priv);
+    std::string priv;
+    store::Wallet w = fromSeed(name.toStdString(), "HD", RTX::toSeed(p), priv);
     store::save(w, {priv, p, ""}, sessionPass_);
     return toView(w);
 }
@@ -150,8 +198,8 @@ WalletView WalletModel::importPrivateKey(const QString& name, const QString& pk)
 WalletView WalletModel::importSeed(const QString& name, const QString& seed) {
     if (!unlocked_) throw std::runtime_error("App is locked");
     std::string phrase = seed.trimmed().toStdString();
-    std::string priv = RTX::toPrivateKey(RTX::toSeed(phrase));
-    store::Wallet w = fromPriv(name.toStdString(), "IMPORTED_SEED", priv);
+    std::string priv;
+    store::Wallet w = fromSeed(name.toStdString(), "IMPORTED_SEED", RTX::toSeed(phrase), priv);
     store::save(w, {priv, phrase, ""}, sessionPass_);
     return toView(w);
 }
@@ -161,8 +209,8 @@ WalletView WalletModel::importEntropy(const QString& name, const QString& entrop
     std::string e = entropy.trimmed().toStdString();
     std::string phrase = RTX::toSeedPhrase(e);
     if (phrase.rfind("Error", 0) == 0) throw std::runtime_error("Invalid entropy (need 32/40/48/56/64 hex chars)");
-    std::string priv = RTX::toPrivateKey(RTX::toSeed(phrase));
-    store::Wallet w = fromPriv(name.toStdString(), "IMPORTED_SEED", priv);
+    std::string priv;
+    store::Wallet w = fromSeed(name.toStdString(), "IMPORTED_SEED", RTX::toSeed(phrase), priv);
     store::save(w, {priv, phrase, e}, sessionPass_);
     return toView(w);
 }
@@ -172,13 +220,29 @@ WalletView WalletModel::watch(const QString& name, const QString& address) {
     w.name = name.toStdString();
     w.type = "WATCH";
     w.encrypted = false;
-    std::string a = address.toStdString();
-    if (a.rfind("0x", 0) == 0 || a.rfind("0X", 0) == 0) w.eth = a;
-    else if (a.rfind("bc1", 0) == 0) w.btcSegwit = a;
-    else if (!a.empty() && (a[0] == '1' || a[0] == '3')) w.btcLegacy = a;
-    else throw std::runtime_error("Unrecognized address format");
+    const std::string a = address.trimmed().toStdString();
+    switch (classify(address)) {
+        case AddressKind::Evm: w.eth = a; break;
+        case AddressKind::BtcSegwit: w.btcSegwit = a; break;
+        case AddressKind::BtcLegacy: w.btcLegacy = a; break;
+        case AddressKind::Tron: w.tron = a; break;
+        case AddressKind::Solana: w.sol = a; break;
+        case AddressKind::Unknown: throw std::runtime_error("Unrecognized address format");
+    }
     store::save(w, {}, "");
     return toView(w);
+}
+
+AddressKind WalletModel::classify(const QString& address) const {
+    switch (rtxaddr::classify(address.trimmed().toStdString())) {
+        case rtxaddr::Kind::Evm: return AddressKind::Evm;
+        case rtxaddr::Kind::BtcSegwit: return AddressKind::BtcSegwit;
+        case rtxaddr::Kind::BtcLegacy: return AddressKind::BtcLegacy;
+        case rtxaddr::Kind::Tron: return AddressKind::Tron;
+        case rtxaddr::Kind::Solana: return AddressKind::Solana;
+        case rtxaddr::Kind::Unknown: break;
+    }
+    return AddressKind::Unknown;
 }
 
 void WalletModel::remove(const QString& name) { store::remove(name.toStdString()); }
@@ -221,6 +285,8 @@ void WalletModel::refreshBalances(const WalletView& w, quint64 gen) {
 
     const std::string eth = w.eth.toStdString();
     const std::string btc = (w.btcSegwit.isEmpty() ? w.btcLegacy : w.btcSegwit).toStdString();
+    const std::string trx = w.tron.toStdString();
+    const std::string solana = w.sol.toStdString();
 
     if (!eth.empty()) {
         run(Chain::Eth,     [eth] { return RTX_BALANCE::EthereumBalanceChecker().getBalance(eth); });
@@ -230,6 +296,18 @@ void WalletModel::refreshBalances(const WalletView& w, quint64 gen) {
     }
     if (!btc.empty()) {
         run(Chain::Btc, [btc] { return RTX_BALANCE::BtcBalanceChecker().getBalance(btc); });
+    }
+    if (!trx.empty()) {
+        run(Chain::Trx,     [trx] { return RTX_BALANCE::TronBalanceChecker().getBalance(trx); });
+        run(Chain::UsdtTrx, [trx] {
+            return RTX_BALANCE::TronBalanceChecker().getTokenBalance(RTX_BALANCE::tokens::tronUSDT(), trx);
+        });
+    }
+    if (!solana.empty()) {
+        run(Chain::Sol, [solana] { return RTX_BALANCE::SolBalanceChecker().getBalance(solana); });
+        run(Chain::UsdtSol, [solana] {
+            return RTX_BALANCE::SolBalanceChecker().getTokenBalance(sol::kUsdtMint, 6, solana);
+        });
     }
 }
 
@@ -249,9 +327,10 @@ void WalletModel::refreshPrices(quint64 gen) {
                 emit self->priceFailed(gen);
                 return;
             }
-            const Chain chains[] = {Chain::Eth, Chain::Bnb, Chain::Btc, Chain::UsdtEth, Chain::UsdcEth};
+            const Chain chains[] = {Chain::Eth,     Chain::Bnb, Chain::Btc,     Chain::UsdtEth,
+                                    Chain::UsdcEth, Chain::Trx, Chain::UsdtTrx, Chain::Sol, Chain::UsdtSol};
             for (Chain c : chains) {
-                const auto it = quotes.find(chainLabel(c).toStdString());
+                const auto it = quotes.find(chainLabel(c).toStdString());  // USDT on any network: one price
                 if (it != quotes.end() && it->second.valid)
                     emit self->priceReady(gen, (int)c, it->second.usd, it->second.change24h, it->second.change7d);
             }
@@ -267,6 +346,8 @@ static rtxsend::Params sendParams(const WalletView& w, int asset, const QString&
     p.asset = static_cast<rtxsend::Asset>(asset);
     p.ethAddress = w.eth.toStdString();
     p.btcAddress = (w.btcSegwit.isEmpty() ? w.btcLegacy : w.btcSegwit).toStdString();
+    p.tronAddress = w.tron.toStdString();
+    p.solAddress = w.sol.toStdString();
     p.to = to.trimmed().toStdString();
     p.amount = amount.trimmed().toStdString();
     p.max = max;
@@ -312,11 +393,20 @@ void WalletModel::executeSend(quint64 gen, const WalletView& w, int asset, const
     if (!unlocked_) throw std::runtime_error("App is locked");
     // Decrypt the key on this (GUI) thread, then hand only the hex to the worker.
     store::Secret secret = store::unlock(w.name.toStdString(), sessionPass_);
-    if (secret.privateKey.empty()) throw std::runtime_error("This wallet has no spending key");
-
     rtxsend::Params params = sendParams(w, asset, to, amount, max);
-    params.privHex = secret.privateKey;
-    secret.privateKey.assign(secret.privateKey.size(), '\0');  // wipe our copy
+    const bool solana = asset == int(Chain::Sol) || asset == int(Chain::UsdtSol);
+    if (solana && !secret.seedPhrase.empty()) {
+        // Solana's ed25519 key comes from the recovery phrase, not the private key.
+        std::array<uint8_t, 32> k = sol::accountKey(RTX::toSeed(secret.seedPhrase));
+        params.solKeyHex = rtxsend::tron::hex(k.data(), k.size());
+        OPENSSL_cleanse(k.data(), k.size());
+    } else if (!solana) {
+        params.privHex = secret.privateKey;
+    }
+    for (std::string* f : {&secret.privateKey, &secret.seedPhrase, &secret.entropy}) f->assign(f->size(), '\0');
+    if (params.privHex.empty() && params.solKeyHex.empty())
+        throw std::runtime_error(solana ? "This wallet has no Solana key: it was imported from a private key"
+                                        : "This wallet has no spending key");
 
     QPointer<WalletModel> self(this);
     std::thread([self, gen, params]() mutable {
@@ -327,7 +417,8 @@ void WalletModel::executeSend(quint64 gen, const WalletView& w, int asset, const
         } catch (const std::exception& e) {
             err = QString::fromUtf8(e.what());
         }
-        params.privHex.assign(params.privHex.size(), '\0');  // wipe the worker's copy
+        params.privHex.assign(params.privHex.size(), '\0');  // wipe the worker's copies
+        params.solKeyHex.assign(params.solKeyHex.size(), '\0');
         QMetaObject::invokeMethod(qApp, [self, gen, res, err] {
             if (!self) return;
             if (!err.isEmpty()) {

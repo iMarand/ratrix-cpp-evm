@@ -17,12 +17,18 @@ namespace wv {
 
 QColor chainColor(Chain c);
 QString chainName(Chain c);     // "Ethereum"
-QString chainNetwork(Chain c);  // "Ethereum Mainnet"
+QString chainNetwork(Chain c);  // "Ethereum Mainnet", "TRC-20 · Tron"
+Chain networkOf(Chain c);       // a token's network (UsdtTrx -> Trx); a coin is its own
+bool isToken(Chain c);
 int maxDecimals(Chain c);
 QString typeLabel(const WalletView& w);  // "HD wallet", "Watch-only", ...
 QString primaryAddress(const WalletView& w);
+QString addressFor(const WalletView& w, Chain c);  // "" if the wallet has none for c
 
 void paintCoin(QPainter& p, Chain c, const QRectF& r);
+// paintCoin plus, for a token, a small badge of its network at the lower
+// right, ringed in `bg` (the color behind the coin) so it reads as a cutout.
+void paintAsset(QPainter& p, Chain c, const QRectF& r, const QColor& bg);
 
 bool isAmount(const QString& raw);
 QString prettyAmount(const QString& raw, int maxDp);  // "1,234.56"

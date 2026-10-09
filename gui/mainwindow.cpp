@@ -30,7 +30,11 @@ namespace {
 
 constexpr int kAsideW = 288;
 constexpr int kGutter = 12;  // space around the floating aside
-const Chain kChains[] = {Chain::Eth, Chain::Btc, Chain::Bnb, Chain::UsdtEth, Chain::UsdcEth};
+const Chain kCoins[] = {Chain::Eth, Chain::Btc, Chain::Bnb, Chain::Sol, Chain::Trx};
+// The same token on different networks gets its own tile: USDT on Ethereum and
+// USDT on Tron are separate balances at separate addresses.
+const Chain kStables[] = {Chain::UsdtEth, Chain::UsdtTrx, Chain::UsdtSol, Chain::UsdcEth};
+const Chain kPrimaryOrder[] = {Chain::Eth, Chain::Btc, Chain::Trx, Chain::Sol};
 
 QString quoted(const QString& s) { return QStringLiteral("“") + s + QStringLiteral("”"); }
 
@@ -310,8 +314,19 @@ QWidget* MainWindow::buildWalletPage() {
     outer->addSpacing(16);
     assetGrid_ = new QGridLayout();
     assetGrid_->setSpacing(12);
-    for (Chain c : kChains) tiles_.push_back(new AssetTile(c));
+    for (Chain c : kCoins) tiles_.push_back(new AssetTile(c));
     outer->addLayout(assetGrid_);
+
+    stableBox_ = new QWidget();
+    auto* sv = new QVBoxLayout(stableBox_);
+    sv->setContentsMargins(0, 24, 0, 0);
+    sv->setSpacing(12);
+    sv->addWidget(ui::caption("Stablecoins"));
+    stableGrid_ = new QGridLayout();
+    stableGrid_->setSpacing(12);
+    for (Chain c : kStables) tiles_.push_back(new AssetTile(c));
+    sv->addLayout(stableGrid_);
+    outer->addWidget(stableBox_);
     outer->addSpacing(44);
 
     outer->addLayout(sectionHeader("Receive", ui::label("Public addresses, safe to share", 13, QFont::Normal, "faint")));
@@ -320,6 +335,8 @@ QWidget* MainWindow::buildWalletPage() {
     addrGrid_->setSpacing(12);
     addrTiles_ = {new AddressTile("EVM address", QStringLiteral("ETH · BNB · ERC-20 tokens"), Chain::Eth),
                   new AddressTile("Bitcoin", "Native SegWit (bc1)", Chain::Btc),
+                  new AddressTile("Tron", QStringLiteral("TRX · TRC-20 tokens"), Chain::Trx),
+                  new AddressTile("Solana", QStringLiteral("SOL · SPL tokens"), Chain::Sol),
                   new AddressTile("Bitcoin legacy", QStringLiteral("P2PKH (1…)"), Chain::Btc)};
     outer->addLayout(addrGrid_);
     outer->addStretch(1);
@@ -336,10 +353,20 @@ void MainWindow::relayoutGrids() {
         for (int i = 0; i < shown.size(); ++i) g->addWidget(shown[i], i / cols, i % cols);
         for (int c = 0; c < 3; ++c) g->setColumnStretch(c, c < cols ? 1 : 0);
     };
-    const QVector<QWidget*> assets(tiles_.begin(), tiles_.end());
-    place(assetGrid_, assets, assets, avail >= 860 ? 3 : 2);
+    QVector<QWidget*> coins, coinsShown, stables, stablesShown;
+    for (AssetTile* t : tiles_) {
+        const bool token = wv::isToken(t->chain());
+        const bool show = showsAsset(t->chain());
+        t->setVisible(show);
+        (token ? stables : coins).push_back(t);
+        if (show) (token ? stablesShown : coinsShown).push_back(t);
+    }
+    const int cols = avail >= 860 ? 3 : 2;
+    place(assetGrid_, coins, coinsShown, cols);
+    place(stableGrid_, stables, stablesShown, cols);
+    stableBox_->setVisible(!stablesShown.isEmpty());
 
-    const QString addrs[] = {current_.eth, current_.btcSegwit, current_.btcLegacy};
+    const QString addrs[] = {current_.eth, current_.btcSegwit, current_.tron, current_.sol, current_.btcLegacy};
     QVector<QWidget*> all, shown;
     for (int i = 0; i < addrTiles_.size(); ++i) {
         all.push_back(addrTiles_[i]);
@@ -347,6 +374,13 @@ void MainWindow::relayoutGrids() {
     }
     const int n = std::max(1, int(shown.size()));
     place(addrGrid_, all, shown, std::min(n, avail >= 1000 ? 3 : (avail >= 620 ? 2 : 1)));
+}
+
+// A wallet holding keys shows every asset (a missing address then reads "No
+// address"); a watch-only wallet shows just the chains of the address it watches.
+bool MainWindow::showsAsset(Chain c) const {
+    if (current_.name.isEmpty() || current_.encrypted) return true;
+    return !wv::addressFor(current_, c).isEmpty();
 }
 
 // ---------------------------------------------------------------------------
@@ -433,7 +467,12 @@ void MainWindow::activate(const QString& name) {
 void MainWindow::showWallet(const WalletView& w) {
     const bool switching = w.name != current_.name;
     current_ = w;
-    primary_ = w.eth.isEmpty() ? Chain::Btc : Chain::Eth;
+    primary_ = Chain::Eth;
+    for (Chain c : kPrimaryOrder)
+        if (!wv::addressFor(w, c).isEmpty()) {
+            primary_ = c;
+            break;
+        }
 
     avatar_->setLabel(w.name);
     name_->setText(w.name);
@@ -443,8 +482,8 @@ void MainWindow::showWallet(const WalletView& w) {
     sendBtn_->setVisible(w.encrypted);  // watch-only wallets hold no key to sign with
     hero_->setWallet(w, primary_);
 
-    const QString addrs[] = {w.eth, w.btcSegwit, w.btcLegacy};
-    for (int i = 0; i < 3; ++i) {
+    const QString addrs[] = {w.eth, w.btcSegwit, w.tron, w.sol, w.btcLegacy};
+    for (int i = 0; i < addrTiles_.size(); ++i) {
         addrTiles_[i]->setAddress(addrs[i]);
         addrTiles_[i]->setVisible(!addrs[i].isEmpty());
     }
@@ -466,14 +505,15 @@ void MainWindow::refresh() {
     ++gen_;
     pending_ = 0;
     model_->refreshPrices(gen_);  // market prices are independent of the wallet's balances
-    const bool hasEth = !current_.eth.isEmpty();
-    const bool hasBtc = !current_.btcSegwit.isEmpty() || !current_.btcLegacy.isEmpty();
     for (auto* t : tiles_) {
-        if (t->chain() == Chain::Btc ? hasBtc : hasEth) {
+        if (!wv::addressFor(current_, t->chain()).isEmpty()) {
             t->setLoading();
             ++pending_;
         } else {
             t->reset();
+            if (wv::networkOf(t->chain()) == Chain::Sol && current_.type == "IMPORTED_PK")
+                t->setToolTip("Solana addresses come from a recovery phrase. "
+                              "This wallet was imported from a private key, so it has none.");
         }
     }
     applyPrices();  // reset() cleared tile values; re-show any cached prices right away
@@ -529,10 +569,7 @@ void MainWindow::settleOne() {
     hero_->setStatus("Updated " + QTime::currentTime().toString("HH:mm"), false);
     int tracked = 0, funded = 0;
     for (auto* t : tiles_) {
-        const bool has = t->chain() == Chain::Btc
-                             ? (!current_.btcSegwit.isEmpty() || !current_.btcLegacy.isEmpty())
-                             : !current_.eth.isEmpty();
-        tracked += has;
+        tracked += !wv::addressFor(current_, t->chain()).isEmpty();
         funded += t->hasPositive();
     }
     assetsMeta_->setText(QString("%1 of %2 with a balance").arg(funded).arg(tracked));

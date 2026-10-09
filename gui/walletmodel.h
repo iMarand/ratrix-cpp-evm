@@ -12,9 +12,11 @@
 struct WalletView {
     QString name;
     QString type;       // HD | IMPORTED_PK | IMPORTED_SEED | WATCH
-    QString eth;        // also the BNB / token address
+    QString eth;        // also the BNB / ERC-20 token address
     QString btcSegwit;
     QString btcLegacy;
+    QString tron;       // TRX + TRC-20 tokens; same key as `eth`
+    QString sol;        // empty for wallets imported from a private key
     bool encrypted = false;
 };
 
@@ -24,9 +26,13 @@ struct SecretView {
     QString wif;
 };
 
-enum class Chain { Eth, Bnb, Btc, UsdtEth, UsdcEth };
+// The values double as rtxsend::Asset codes (what Send can spend).
+enum class Chain { Eth, Bnb, Btc, UsdtEth, UsdcEth, Trx, UsdtTrx, Sol, UsdtSol };
 
-QString chainLabel(Chain c);
+QString chainLabel(Chain c);  // ticker: "ETH", "USDT", ...
+
+// What kind of public address a string is (for watch-only wallets).
+enum class AddressKind { Unknown, Evm, BtcSegwit, BtcLegacy, Tron, Solana };
 
 class WalletModel : public QObject {
     Q_OBJECT
@@ -62,6 +68,7 @@ public:
     WalletView importSeed(const QString& name, const QString& seed);
     WalletView importEntropy(const QString& name, const QString& entropy);
     WalletView watch(const QString& name, const QString& address);
+    AddressKind classify(const QString& address) const;  // what watch() would track
     void remove(const QString& name);
 
     SecretView unlock(const QString& name);  // decrypts with the session passphrase
@@ -102,6 +109,8 @@ signals:
     void sendError(quint64 gen, QString error);
 
 private:
+    void addMissingAddresses();  // derive Solana for wallets made before it existed
+
     std::string sessionPass_;
     bool unlocked_ = false;
 };

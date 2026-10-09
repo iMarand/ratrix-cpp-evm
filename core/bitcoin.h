@@ -11,6 +11,7 @@
 //   - P2WPKH (native segwit, "bc1q..."), Bech32 over witness v0 + HASH160
 //   - WIF export of the private key (compressed)
 
+#include <algorithm>
 #include <array>
 #include <stdexcept>
 #include <string>
@@ -103,6 +104,43 @@ inline std::string base58Check(const std::vector<uint8_t>& payload) {
     std::vector<uint8_t> full = payload;
     full.insert(full.end(), h2.begin(), h2.begin() + 4);
     return base58(full);
+}
+
+// Base58 text -> bytes; each leading '1' is a leading zero byte.
+inline std::vector<uint8_t> base58Decode(const std::string& s) {
+    static const char* kAlphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+    size_t zeros = 0;
+    while (zeros < s.size() && s[zeros] == '1') ++zeros;
+    std::vector<uint8_t> num;
+    for (char c : s) {
+        const char* p = std::char_traits<char>::find(kAlphabet, 58, c);
+        if (!p) throw std::runtime_error("Not a valid Base58 address");
+        int carry = static_cast<int>(p - kAlphabet);
+        for (auto it = num.rbegin(); it != num.rend(); ++it) {
+            carry += 58 * (*it);
+            *it = carry & 0xff;
+            carry >>= 8;
+        }
+        while (carry) {
+            num.insert(num.begin(), carry & 0xff);
+            carry >>= 8;
+        }
+    }
+    std::vector<uint8_t> out(zeros, 0x00);
+    out.insert(out.end(), num.begin(), num.end());
+    return out;
+}
+
+// Base58Check text -> payload (version byte + data), after verifying the
+// 4-byte double-SHA256 checksum.
+inline std::vector<uint8_t> base58CheckDecode(const std::string& s) {
+    const std::vector<uint8_t> raw = base58Decode(s);
+    if (raw.size() < 5) throw std::runtime_error("Address too short");
+    std::vector<uint8_t> payload(raw.begin(), raw.end() - 4);
+    auto h1 = sha256(payload.data(), payload.size());
+    auto h2 = sha256(h1.data(), h1.size());
+    if (!std::equal(raw.end() - 4, raw.end(), h2.begin())) throw std::runtime_error("Bad address checksum");
+    return payload;
 }
 
 // ------------------------------- Bech32 (BIP173) -------------------------

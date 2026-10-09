@@ -42,6 +42,8 @@ struct Wallet {
     std::string eth;
     std::string btcSegwit;
     std::string btcLegacy;
+    std::string tron;        // "T..."; same key as `eth`
+    std::string sol;         // from the seed phrase; empty for key-only imports
     bool encrypted = false;  // false for WATCH-only
 };
 
@@ -185,6 +187,14 @@ inline json loadRaw(const std::string& name) {
     return json::parse(f);
 }
 
+// Writes JSON to `path` via a temp file + rename, so a crash never leaves a
+// half-written file behind.
+inline void writeJson(const fs::path& path, const json& j) {
+    const fs::path tmp = path.string() + ".tmp";
+    { std::ofstream f(tmp, std::ios::trunc); f << j.dump(2) << "\n"; }
+    fs::rename(tmp, path);
+}
+
 inline Wallet meta(const json& j) {
     Wallet w;
     w.name = j.value("name", "");
@@ -192,6 +202,8 @@ inline Wallet meta(const json& j) {
     w.eth = j.value("/addresses/eth"_json_pointer, std::string());
     w.btcSegwit = j.value("/addresses/btcSegwit"_json_pointer, std::string());
     w.btcLegacy = j.value("/addresses/btcLegacy"_json_pointer, std::string());
+    w.tron = j.value("/addresses/tron"_json_pointer, std::string());
+    w.sol = j.value("/addresses/sol"_json_pointer, std::string());
     w.encrypted = j.contains("crypto");
     return w;
 }
@@ -204,7 +216,8 @@ inline void save(const Wallet& w, const Secret& secret, const std::string& passp
     j["ratrixWallet"] = 1;
     j["name"] = w.name;
     j["type"] = w.type;
-    j["addresses"] = {{"eth", w.eth}, {"btcSegwit", w.btcSegwit}, {"btcLegacy", w.btcLegacy}};
+    j["addresses"] = {{"eth", w.eth}, {"btcSegwit", w.btcSegwit}, {"btcLegacy", w.btcLegacy},
+                      {"tron", w.tron}, {"sol", w.sol}};
 
     if (w.encrypted) {
         if (passphrase.empty()) throw std::runtime_error("a passphrase is required to encrypt this wallet");
@@ -219,9 +232,16 @@ inline void save(const Wallet& w, const Secret& secret, const std::string& passp
                        {"iv", b64encode(iv)}, {"tag", b64encode(tag)}, {"ct", b64encode(ct)}};
     }
 
-    const fs::path tmp = walletPath(w.name).string() + ".tmp";
-    { std::ofstream f(tmp, std::ios::trunc); f << j.dump(2) << "\n"; }
-    fs::rename(tmp, walletPath(w.name));
+    writeJson(walletPath(w.name), j);
+}
+
+// Sets one public address (e.g. "sol") in an existing wallet file, leaving its
+// encrypted secret untouched. Used to fill in chains added after the wallet
+// was created.
+inline void setAddress(const std::string& name, const std::string& chain, const std::string& address) {
+    json j = loadRaw(name);
+    j["addresses"][chain] = address;
+    writeJson(walletPath(name), j);
 }
 
 inline Secret unlock(const std::string& name, const std::string& passphrase) {
@@ -264,9 +284,7 @@ inline void setupApp(const std::string& pass) {
     json j = {{"kdf", "scrypt"}, {"n", 1u << 15}, {"r", 8}, {"p", 1},
               {"salt", b64encode(salt)}, {"iv", b64encode(iv)},
               {"tag", b64encode(tag)}, {"check", b64encode(ct)}};
-    const fs::path tmp = appLockPath().string() + ".tmp";
-    { std::ofstream f(tmp, std::ios::trunc); f << j.dump(2) << "\n"; }
-    fs::rename(tmp, appLockPath());
+    writeJson(appLockPath(), j);
 }
 
 inline bool verifyApp(const std::string& pass) {

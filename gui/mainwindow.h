@@ -50,6 +50,7 @@ private:
     void watchAddress();
     void updateListState();
     void relayoutGrids();
+    bool showsAsset(Chain c) const;  // is this tile part of the current wallet's page?
 
     WalletModel* model_;
     QStackedWidget* root_ = nullptr;  // lock screen | shell
@@ -73,10 +74,12 @@ private:
     Button* deleteBtn_ = nullptr;
     BalanceHero* hero_ = nullptr;
     QLabel* assetsMeta_ = nullptr;
-    QGridLayout* assetGrid_ = nullptr;
-    QVector<AssetTile*> tiles_;
+    QGridLayout* assetGrid_ = nullptr;   // coins
+    QWidget* stableBox_ = nullptr;       // "Stablecoins" caption + grid
+    QGridLayout* stableGrid_ = nullptr;
+    QVector<AssetTile*> tiles_;          // coins, then stablecoins
     QGridLayout* addrGrid_ = nullptr;
-    QVector<AddressTile*> addrTiles_;  // EVM, BTC SegWit, BTC legacy
+    QVector<AddressTile*> addrTiles_;    // EVM, BTC SegWit, Tron, Solana, BTC legacy
 
     WalletView current_;
     Chain primary_ = Chain::Eth;

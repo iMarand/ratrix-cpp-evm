@@ -117,6 +117,10 @@ QColor chainColor(Chain c) {
         case Chain::Btc: return P.btc;
         case Chain::UsdtEth: return P.usdt;
         case Chain::UsdcEth: return P.usdc;
+        case Chain::Trx: return P.trx;
+        case Chain::UsdtTrx: return P.usdt;
+        case Chain::Sol: return P.sol;
+        case Chain::UsdtSol: return P.usdt;
     }
     return P.accent;
 }
@@ -126,8 +130,12 @@ QString chainName(Chain c) {
         case Chain::Eth: return "Ethereum";
         case Chain::Bnb: return "BNB";
         case Chain::Btc: return "Bitcoin";
-        case Chain::UsdtEth: return "Tether USD";
+        case Chain::UsdtEth:
+        case Chain::UsdtTrx:
+        case Chain::UsdtSol: return "Tether USD";
         case Chain::UsdcEth: return "USD Coin";
+        case Chain::Trx: return "Tron";
+        case Chain::Sol: return "Solana";
     }
     return "?";
 }
@@ -139,9 +147,25 @@ QString chainNetwork(Chain c) {
         case Chain::Btc: return "Bitcoin Mainnet";
         case Chain::UsdtEth:
         case Chain::UsdcEth: return QStringLiteral("ERC-20 · Ethereum");
+        case Chain::Trx: return "Tron Mainnet";
+        case Chain::UsdtTrx: return QStringLiteral("TRC-20 · Tron");
+        case Chain::Sol: return "Solana Mainnet";
+        case Chain::UsdtSol: return QStringLiteral("SPL · Solana");
     }
     return {};
 }
+
+Chain networkOf(Chain c) {
+    switch (c) {
+        case Chain::UsdtEth:
+        case Chain::UsdcEth: return Chain::Eth;
+        case Chain::UsdtTrx: return Chain::Trx;
+        case Chain::UsdtSol: return Chain::Sol;
+        default: return c;
+    }
+}
+
+bool isToken(Chain c) { return networkOf(c) != c; }
 
 int maxDecimals(Chain c) { return c == Chain::Btc ? 8 : 6; }
 
@@ -154,8 +178,18 @@ QString typeLabel(const WalletView& w) {
 }
 
 QString primaryAddress(const WalletView& w) {
-    if (!w.eth.isEmpty()) return w.eth;
-    return w.btcSegwit.isEmpty() ? w.btcLegacy : w.btcSegwit;
+    for (Chain c : {Chain::Eth, Chain::Btc, Chain::Trx, Chain::Sol})
+        if (const QString a = addressFor(w, c); !a.isEmpty()) return a;
+    return {};
+}
+
+QString addressFor(const WalletView& w, Chain c) {
+    switch (networkOf(c)) {
+        case Chain::Btc: return w.btcSegwit.isEmpty() ? w.btcLegacy : w.btcSegwit;
+        case Chain::Trx: return w.tron;
+        case Chain::Sol: return w.sol;
+        default: return w.eth;  // ETH, BNB and the ERC-20 tokens share the EVM address
+    }
 }
 
 void paintCoin(QPainter& p, Chain c, const QRectF& r) {
@@ -204,7 +238,27 @@ void paintCoin(QPainter& p, Chain c, const QRectF& r) {
             p.setFont(theme::font(17, QFont::Bold));
             p.drawText(QRectF(0, 0, 24, 24), Qt::AlignCenter, "B");
             break;
+        case Chain::Trx: {
+            // TRON mark: a slanted triangle with facet lines meeting inside.
+            const QPointF a(3.5, 4.2), b(20.8, 8.4), c2(11.2, 20.8), d(14.4, 10.4);
+            p.setPen(QPen(gc, 1.7, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+            p.setBrush(Qt::NoBrush);
+            p.drawPolygon(QPolygonF{a, b, c2});
+            p.drawLine(a, d);
+            p.drawLine(d, b);
+            p.drawLine(d, c2);
+            break;
+        }
+        case Chain::Sol:
+            // Three slanted bars, the middle one mirrored.
+            p.setBrush(gc);
+            p.drawPolygon(QPolygonF{QPointF(7.6, 5.2), QPointF(20.4, 5.2), QPointF(16.8, 8.6), QPointF(4, 8.6)});
+            p.drawPolygon(QPolygonF{QPointF(4, 10.3), QPointF(16.8, 10.3), QPointF(20.4, 13.7), QPointF(7.6, 13.7)});
+            p.drawPolygon(QPolygonF{QPointF(7.6, 15.4), QPointF(20.4, 15.4), QPointF(16.8, 18.8), QPointF(4, 18.8)});
+            break;
         case Chain::UsdtEth:
+        case Chain::UsdtTrx:
+        case Chain::UsdtSol:
             p.setBrush(gc);
             p.drawRoundedRect(QRectF(5.5, 4.8, 13, 3.4), 0.8, 0.8);
             p.drawRoundedRect(QRectF(10.3, 4.8, 3.4, 15.4), 0.8, 0.8);
@@ -223,6 +277,21 @@ void paintCoin(QPainter& p, Chain c, const QRectF& r) {
             break;
     }
     p.restore();
+}
+
+void paintAsset(QPainter& p, Chain c, const QRectF& r, const QColor& bg) {
+    paintCoin(p, c, r);
+    if (!isToken(c)) return;
+    const qreal d = r.width() * 0.44;                  // badge diameter
+    const qreal ring = std::max(2.0, r.width() * 0.06);
+    const QRectF badge(r.right() - d + ring, r.bottom() - d + ring, d, d);
+    p.save();
+    p.setRenderHint(QPainter::Antialiasing);
+    p.setPen(Qt::NoPen);
+    p.setBrush(bg);
+    p.drawEllipse(badge.adjusted(-ring, -ring, ring, ring));
+    p.restore();
+    paintCoin(p, networkOf(c), badge);
 }
 
 bool isAmount(const QString& raw) {
@@ -386,13 +455,14 @@ void AssetTile::paintEvent(QPaintEvent*) {
     p.translate(0, (1 - rv) * 10);
 
     const QRectF r = QRectF(rect());
+    const QColor bg = mix(P.surface, P.surface2, 0.7 * hover_);
     p.setPen(Qt::NoPen);
-    p.setBrush(mix(P.surface, P.surface2, 0.7 * hover_));
+    p.setBrush(bg);
     p.drawRoundedRect(r, 20, 20);
 
     const qreal pad = 18;
     const QRectF coin(pad, pad, 38, 38);
-    wv::paintCoin(p, c_, coin);
+    wv::paintAsset(p, c_, coin, bg);
     const qreal tx = coin.right() + 12;
     // Top-right: live 7-day price change.
     const qreal chW = hasPrice_ ? changeWidth(change7d_, 12) : 0;
@@ -483,7 +553,7 @@ BalanceHero::BalanceHero(QWidget* parent) : QWidget(parent), amount_(this) {
 
 void BalanceHero::setWallet(const WalletView& w, Chain primary) {
     primary_ = primary;
-    address_ = primary == Chain::Btc ? (w.btcSegwit.isEmpty() ? w.btcLegacy : w.btcSegwit) : w.eth;
+    address_ = wv::addressFor(w, primary);
     st_ = State::Empty;
     amount_.clear();
     status_.clear();

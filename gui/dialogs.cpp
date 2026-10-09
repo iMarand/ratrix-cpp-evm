@@ -24,6 +24,7 @@
 #include <algorithm>
 #include <cmath>
 #include <functional>
+#include <optional>
 #include <stdexcept>
 
 #include "theme.h"
@@ -285,20 +286,21 @@ private:
 class CoinSlot : public QWidget {
 public:
     explicit CoinSlot(int size, QWidget* parent = nullptr) : QWidget(parent) { setFixedSize(size, size); }
-    void set(int kind) {  // 0 none, 1 EVM, 2 Bitcoin
-        kind_ = kind;
+    void set(std::optional<Chain> coin) {  // nullopt: nothing detected
+        coin_ = coin;
+        setVisible(coin_.has_value());
         update();
     }
 
 protected:
     void paintEvent(QPaintEvent*) override {
-        if (!kind_) return;
+        if (!coin_) return;
         QPainter p(this);
-        wv::paintCoin(p, kind_ == 1 ? Chain::Eth : Chain::Btc, QRectF(rect()).adjusted(0.5, 0.5, -0.5, -0.5));
+        wv::paintCoin(p, *coin_, QRectF(rect()).adjusted(0.5, 0.5, -0.5, -0.5));
     }
 
 private:
-    int kind_ = 0;
+    std::optional<Chain> coin_;
 };
 
 // ---------------------------------------------------------------------------
@@ -562,12 +564,18 @@ void successSheet(QWidget* parent, const QString& title, const QString& subtitle
         b->addWidget(block("Recovery phrase", grid, copy));
         b->addSpacing(18);
     }
-    if (!w.eth.isEmpty()) {
-        b->addWidget(new SecretRow("ETH / BNB / token address", w.eth, false));
-        b->addSpacing(14);
-    }
     const QString btc = w.btcSegwit.isEmpty() ? w.btcLegacy : w.btcSegwit;
-    if (!btc.isEmpty()) b->addWidget(new SecretRow("Bitcoin address", btc, false));
+    const std::pair<QString, QString> rows[] = {{"ETH / BNB / ERC-20 address", w.eth},
+                                                {"Bitcoin address", btc},
+                                                {"Tron address (TRX / TRC-20)", w.tron},
+                                                {"Solana address", w.sol}};
+    bool first = true;
+    for (const auto& [label, address] : rows) {
+        if (address.isEmpty()) continue;
+        if (!first) b->addSpacing(14);
+        b->addWidget(new SecretRow(label, address, false));
+        first = false;
+    }
     s.addButton("Done", Button::Primary, true);
     s.exec();
 }
@@ -850,7 +858,7 @@ QString watchAddress(QWidget* parent, WalletModel* m) {
     b->addWidget(block("Label", name));
     b->addSpacing(20);
 
-    auto* addr = new TextField(QStringLiteral("0x…  or  bc1… / 1… / 3…"));
+    auto* addr = new TextField(QStringLiteral("0x…  ·  bc1… / 1… / 3…  ·  T…  ·  Solana"));
     addr->setMono(true);
     addr->setLeadingIcon(Icon::Wallet);
     b->addWidget(block("Address", addr));
@@ -865,38 +873,49 @@ QString watchAddress(QWidget* parent, WalletModel* m) {
     detectRow->addWidget(hint, 1);
     b->addLayout(detectRow);
 
-    // Mirrors WalletModel::watch(): prefix decides the chain.
-    auto detect = [addr, coin, hint] {
+    // Uses WalletModel::classify(), so the hint matches what watch() will track.
+    auto detect = [m, addr, coin, hint] {
         const QString a = addr->text().trimmed();
-        static const QRegularExpression evm("^0[xX][0-9a-fA-F]{40}$");
-        int c = 0;
+        std::optional<Chain> c;
         QString t;
-        const char* tone = "faint";
-        if (a.isEmpty()) {
-            t = QStringLiteral("Paste an Ethereum (0x…) or Bitcoin (bc1…, 1…, 3…) address.");
-        } else if (a.startsWith("0x", Qt::CaseInsensitive)) {
-            c = 1;
-            if (evm.match(a).hasMatch()) {
-                t = QStringLiteral("EVM address · tracks ETH, BNB, USDT and USDC");
-                tone = "muted";
-            } else {
-                t = QString("Starts like an EVM address but has %1 of 42 characters").arg(a.size());
+        const char* tone = "muted";
+        switch (a.isEmpty() ? AddressKind::Unknown : m->classify(a)) {
+            case AddressKind::Evm:
+                c = Chain::Eth;
+                t = QStringLiteral("EVM address · tracks ETH, BNB, USDT and USDC (ERC-20)");
+                break;
+            case AddressKind::BtcSegwit:
+                c = Chain::Btc;
+                t = "Bitcoin SegWit address";
+                break;
+            case AddressKind::BtcLegacy:
+                c = Chain::Btc;
+                t = "Bitcoin legacy address";
+                break;
+            case AddressKind::Tron:
+                c = Chain::Trx;
+                t = QStringLiteral("Tron address · tracks TRX and USDT (TRC-20)");
+                break;
+            case AddressKind::Solana:
+                c = Chain::Sol;
+                t = QStringLiteral("Solana address · tracks SOL");
+                break;
+            case AddressKind::Unknown:
                 tone = "faint";
-            }
-        } else if (a.startsWith("bc1")) {
-            c = 2;
-            t = "Bitcoin SegWit address";
-            tone = "muted";
-        } else if (a[0] == '1' || a[0] == '3') {
-            c = 2;
-            t = "Bitcoin legacy address";
-            tone = "muted";
-        } else {
-            t = "Unrecognized address format";
-            tone = "danger";
+                if (a.isEmpty()) {
+                    t = QStringLiteral("Paste an Ethereum (0x…), Bitcoin, Tron (T…) or Solana address.");
+                } else if (a.startsWith("0x", Qt::CaseInsensitive) && a.size() != 42) {
+                    c = Chain::Eth;
+                    t = QString("Starts like an EVM address but has %1 of 42 characters").arg(a.size());
+                } else if (a.size() < 26) {
+                    t = "Not a complete address yet";
+                } else {
+                    t = "Unrecognized address format, or a typo in it";
+                    tone = "danger";
+                }
+                break;
         }
         coin->set(c);
-        coin->setVisible(c != 0);
         hint->setText(t);
         ui::setTone(hint, tone);
     };
@@ -1039,7 +1058,7 @@ void revealSecret(QWidget* parent, WalletModel* m, const QString& walletName) {
         b->addWidget(block("Recovery phrase", grid, phraseCopy));
         b->addSpacing(18);
     }
-    auto* pk = new SecretRow("Private key", sec.privateKey, true);
+    auto* pk = new SecretRow("Private key · ETH, BNB, Tron", sec.privateKey, true);
     pk->setConcealed(true);
     b->addWidget(pk);
     SecretRow* wif = nullptr;
@@ -1049,6 +1068,14 @@ void revealSecret(QWidget* parent, WalletModel* m, const QString& walletName) {
         wif->setConcealed(true);
         b->addWidget(wif);
     }
+    b->addSpacing(12);
+    auto* where = ui::label(sec.seedPhrase.isEmpty()
+                                ? QStringLiteral("The private key also opens the Tron address in TronLink.")
+                                : QStringLiteral("The private key also opens the Tron address in TronLink. Solana is "
+                                                 "restored from the recovery phrase (Phantom, Solflare)."),
+                            12, QFont::Normal, "faint");
+    where->setWordWrap(true);
+    b->addWidget(where);
 
     s.addButton("Close", Button::Secondary, false);
     auto* hold = new HoldButton("Hold to reveal");
@@ -1069,15 +1096,31 @@ void revealSecret(QWidget* parent, WalletModel* m, const QString& walletName) {
 
 bool sendFunds(QWidget* parent, WalletModel* m, const WalletView& w) {
     const auto& P = theme::pal();
-    // Assets this wallet can send (codes match the Chain enum).
-    QVector<int> assets;
-    QStringList syms;
-    if (!w.eth.isEmpty()) { assets << 0 << 1 << 3 << 4; syms << "ETH" << "BNB" << "USDT" << "USDC"; }
-    if (!w.btcSegwit.isEmpty() || !w.btcLegacy.isEmpty()) { assets << 2; syms << "BTC"; }
-    if (assets.isEmpty()) {
+    // Assets this wallet can send, as Chain codes. USDT lives on several
+    // networks (Ethereum, Tron, Solana), so it also gets a network choice.
+    struct Option {
+        QString sym;
+        QVector<int> codes;  // one per network; USDT: {UsdtEth, UsdtTrx, UsdtSol}
+    };
+    QVector<Option> opts;
+    const bool evm = !w.eth.isEmpty(), onTron = !w.tron.isEmpty(), onSol = !w.sol.isEmpty();
+    if (evm) opts.push_back({"ETH", {int(Chain::Eth)}});
+    if (!w.btcSegwit.isEmpty() || !w.btcLegacy.isEmpty()) opts.push_back({"BTC", {int(Chain::Btc)}});
+    if (evm) opts.push_back({"BNB", {int(Chain::Bnb)}});
+    if (onTron) opts.push_back({"TRX", {int(Chain::Trx)}});
+    if (onSol) opts.push_back({"SOL", {int(Chain::Sol)}});
+    Option usdt{"USDT", {}};
+    if (evm) usdt.codes << int(Chain::UsdtEth);
+    if (onTron) usdt.codes << int(Chain::UsdtTrx);
+    if (onSol) usdt.codes << int(Chain::UsdtSol);
+    if (!usdt.codes.isEmpty()) opts.push_back(usdt);
+    if (evm) opts.push_back({"USDC", {int(Chain::UsdcEth)}});
+    if (opts.isEmpty()) {
         Toast::notify(parent, "This wallet has no spendable address", Icon::Alert, true);
         return false;
     }
+    QStringList syms;
+    for (const auto& o : opts) syms << o.sym;
 
     Sheet s(parent, "Send", "Choose an asset, enter a recipient and amount, then review the fee.", Icon::Send,
             Sheet::Neutral, 480);
@@ -1086,6 +1129,20 @@ bool sendFunds(QWidget* parent, WalletModel* m, const WalletView& w) {
     auto* picker = new Segmented(syms);
     b->addWidget(block("Asset", picker));
     b->addSpacing(20);
+
+    // Only shown for an asset on more than one network (USDT); one segment per
+    // network, in the order of usdt.codes.
+    QStringList networks;
+    for (int c : usdt.codes)
+        networks << (c == int(Chain::UsdtTrx)   ? QStringLiteral("Tron · TRC-20")
+                     : c == int(Chain::UsdtSol) ? QStringLiteral("Solana · SPL")
+                                                : QStringLiteral("Ethereum · ERC-20"));
+    auto* network = new Segmented(networks.isEmpty() ? QStringList{QString()} : networks);
+    auto* networkRow = new QWidget();
+    auto* nl = new QVBoxLayout(networkRow);
+    nl->setContentsMargins(0, 0, 0, 20);
+    nl->addWidget(block("Network", network));
+    b->addWidget(networkRow);
 
     auto* to = new TextField();
     to->setMono(true);
@@ -1169,18 +1226,45 @@ bool sendFunds(QWidget* parent, WalletModel* m, const WalletView& w) {
     QString explorerUrl;
     quint64 gen = 0;
 
-    auto curAsset = [&] { return assets[picker->current()]; };
+    auto multiNetwork = [&] { return opts[picker->current()].codes.size() > 1; };
+    auto curAsset = [&] {
+        const Option& o = opts[picker->current()];
+        return o.codes.size() > 1 ? o.codes[std::min<int>(network->current(), int(o.codes.size()) - 1)] : o.codes[0];
+    };
     auto placeholderFor = [](int a) {
-        return a == 2 ? QStringLiteral("bc1…  or  1… / 3…") : QStringLiteral("0x…");
+        if (a == int(Chain::Btc)) return QStringLiteral("bc1…  or  1… / 3…");
+        if (a == int(Chain::Trx) || a == int(Chain::UsdtTrx)) return QStringLiteral("T…");
+        if (a == int(Chain::Sol) || a == int(Chain::UsdtSol)) return QStringLiteral("Solana wallet address");
+        return QStringLiteral("0x…");
+    };
+    // A token sent on the wrong network is lost, so name the network up front.
+    auto tokenStandard = [](int a) -> QString {
+        if (a == int(Chain::UsdtEth) || a == int(Chain::UsdcEth)) return " (ERC-20)";
+        if (a == int(Chain::UsdtTrx)) return " (TRC-20)";
+        if (a == int(Chain::UsdtSol)) return " (SPL)";
+        return {};
+    };
+    auto emptyHint = [&](int a) -> QString {
+        const QString sym = syms[picker->current()];
+        if (a == int(Chain::UsdtEth) || a == int(Chain::UsdcEth))
+            return "Sends " + sym + " on Ethereum (ERC-20). The recipient must be an Ethereum address (0x…).";
+        if (a == int(Chain::UsdtTrx))
+            return QStringLiteral("Sends USDT on Tron (TRC-20). The recipient must be a Tron address (T…); "
+                                  "the fee is paid in TRX.");
+        if (a == int(Chain::UsdtSol))
+            return QStringLiteral("Sends USDT on Solana (SPL). Enter the recipient's Solana wallet address; "
+                                  "the fee is paid in SOL.");
+        return QStringLiteral("The address funds will be sent to.");
     };
     auto validateAddr = [&] {
         const QString e = m->addressError(curAsset(), to->text());
+        const QString sym = syms[picker->current()];
         if (to->text().trimmed().isEmpty()) {
-            addrHint->setText("The address funds will be sent to.");
+            addrHint->setText(emptyHint(curAsset()));
             ui::setTone(addrHint, "faint");
             to->setError(false);
         } else if (e.isEmpty()) {
-            addrHint->setText(QStringLiteral("✓  Valid ") + syms[picker->current()] + " address");
+            addrHint->setText(QStringLiteral("✓  Valid ") + sym + tokenStandard(curAsset()) + " address");
             ui::setTone(addrHint, "muted");
             to->setError(false);
         } else {
@@ -1206,14 +1290,31 @@ bool sendFunds(QWidget* parent, WalletModel* m, const WalletView& w) {
         resetReview();
     };
 
-    QObject::connect(picker, &Segmented::changed, &s, [&](int) {
+    auto assetChanged = [&] {
+        networkRow->setVisible(multiNetwork());
         to->edit()->setPlaceholderText(placeholderFor(curAsset()));
         validateAddr();
         resetReview();
+    };
+    QObject::connect(picker, &Segmented::changed, &s, assetChanged);
+    QObject::connect(network, &Segmented::changed, &s, assetChanged);
+    QObject::connect(to, &TextField::textChanged, &s, [&] {
+        // An address exists on only one of USDT's networks; follow it.
+        if (multiNetwork()) {
+            const AddressKind k = m->classify(to->text());
+            const int code = k == AddressKind::Tron     ? int(Chain::UsdtTrx)
+                             : k == AddressKind::Solana ? int(Chain::UsdtSol)
+                             : k == AddressKind::Evm    ? int(Chain::UsdtEth)
+                                                        : -1;
+            const int idx = int(opts[picker->current()].codes.indexOf(code));
+            if (idx >= 0) network->setCurrent(idx);
+        }
+        validateAddr();
+        resetReview();
     });
-    QObject::connect(to, &TextField::textChanged, &s, [&] { validateAddr(); resetReview(); });
     QObject::connect(amount, &TextField::textChanged, &s, [&] { resetReview(); });
     QObject::connect(maxBtn, &QPushButton::clicked, &s, [&] { setMax(!maxMode); });
+    networkRow->setVisible(multiNetwork());
     to->edit()->setPlaceholderText(placeholderFor(curAsset()));
     validateAddr();
 
